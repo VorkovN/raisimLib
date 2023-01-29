@@ -22,10 +22,26 @@ class ENVIRONMENT : public RaisimGymEnv {
     world_ = std::make_unique<raisim::World>();
 
     /// add objects
-    anymal_ = world_->addArticulatedSystem(resourceDir_+"/anymal/urdf/anymal.urdf");
+    anymal_ = world_->addArticulatedSystem(resourceDir_+"\\aliengo\\aliengo.urdf");
     anymal_->setName("anymal");
     anymal_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
     world_->addGround();
+
+    float stepHigh = 0.1;
+    uint8_t stepCount = 25;
+    float mass = 1;
+    float stepWidth = 0.25;
+    float stairY = 0;
+    float stairWidth = 2;
+    for (int stepNumber=0; stepNumber < stepCount; ++stepNumber)
+    {
+      float stepLength =  (stepCount - stepNumber) * stepWidth;
+      float stairX = stepLength/2 + 0.5;
+
+      auto box = world_->addBox(stepLength,stairWidth,stepHigh, mass);
+      box->setPosition(raisim::Vec<3>{stairX+stepNumber*stepWidth,stairY,stepHigh*stepNumber});
+      box->setBodyType(raisim::BodyType::STATIC);
+    }
 
     /// get robot data
     gcDim_ = anymal_->getGeneralizedCoordinateDim();
