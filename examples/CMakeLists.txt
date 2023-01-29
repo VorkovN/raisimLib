@@ -50,6 +50,7 @@ endfunction()
 create_executable(speed_test src/benchmark/speed_test.cpp)
 
 # server examples
+create_executable(unitreeWithStairs src/server/unitreeWithStairs.cpp)
 create_executable(primitives src/server/primitives.cpp)
 create_executable(meshes src/server/meshes.cpp)
 create_executable(laikago src/server/laikago.cpp)
