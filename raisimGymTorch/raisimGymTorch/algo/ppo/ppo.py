@@ -3,7 +3,7 @@ import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 from .storage import RolloutStorage
 
 
@@ -20,14 +20,15 @@ class PPO:
                  lam=0.95,
                  value_loss_coef=0.5,
                  entropy_coef=0.0,
-                 learning_rate=5e-4,
+                 learning_rate=0.0007,
                  max_grad_norm=0.5,
                  learning_rate_schedule='adaptive',
                  desired_kl=0.01,
                  use_clipped_value_loss=True,
                  log_dir='run',
-                 device='cpu',
-                 shuffle_batch=True):
+                 device = torch.device('cpu'),
+		 #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+        shuffle_batch=True):
 
         # PPO components
         self.actor = actor
@@ -59,7 +60,7 @@ class PPO:
 
         # Log
         self.log_dir = os.path.join(log_dir, datetime.now().strftime('%b%d_%H-%M-%S'))
-        self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
+        # self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
         self.tot_timesteps = 0
         self.tot_time = 0
 
@@ -88,23 +89,24 @@ class PPO:
 
         # Learning step
         self.storage.compute_returns(last_values.to(self.device), self.critic, self.gamma, self.lam)
-        mean_value_loss, mean_surrogate_loss, infos = self._train_step(log_this_iteration)
+        self._train_step(log_this_iteration)
+        # mean_value_loss, mean_surrogate_loss, infos = self._train_step(log_this_iteration)
         self.storage.clear()
 
-        if log_this_iteration:
-            self.log({**locals(), **infos, 'it': update})
+        # if log_this_iteration:
+        #     self.log({**locals(), **infos, 'it': update})
 
-    def log(self, variables):
-        self.tot_timesteps += self.num_transitions_per_env * self.num_envs
-        mean_std = self.actor.distribution.std.mean()
-        self.writer.add_scalar('PPO/value_function', variables['mean_value_loss'], variables['it'])
-        self.writer.add_scalar('PPO/surrogate', variables['mean_surrogate_loss'], variables['it'])
-        self.writer.add_scalar('PPO/mean_noise_std', mean_std.item(), variables['it'])
-        self.writer.add_scalar('PPO/learning_rate', self.learning_rate, variables['it'])
+    # def log(self, variables):
+        # self.tot_timesteps += self.num_transitions_per_env * self.num_envs
+        # mean_std = self.actor.distribution.std.mean()
+        # self.writer.add_scalar('PPO/value_function', variables['mean_value_loss'], variables['it'])
+        # self.writer.add_scalar('PPO/surrogate', variables['mean_surrogate_loss'], variables['it'])
+        # self.writer.add_scalar('PPO/mean_noise_std', mean_std.item(), variables['it'])
+        # self.writer.add_scalar('PPO/learning_rate', self.learning_rate, variables['it'])
 
     def _train_step(self, log_this_iteration):
-        mean_value_loss = 0
-        mean_surrogate_loss = 0
+        # mean_value_loss = 0
+        # mean_surrogate_loss = 0
         for epoch in range(self.num_learning_epochs):
             for actor_obs_batch, critic_obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
                     in self.batch_sampler(self.num_mini_batches):
@@ -156,13 +158,14 @@ class PPO:
                 nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters()], self.max_grad_norm)
                 self.optimizer.step()
 
-                if log_this_iteration:
-                    mean_value_loss += value_loss.item()
-                    mean_surrogate_loss += surrogate_loss.item()
+                # if log_this_iteration:
+                #     mean_value_loss += value_loss.item()
+                #     mean_surrogate_loss += surrogate_loss.item()
 
-        if log_this_iteration:
-            num_updates = self.num_learning_epochs * self.num_mini_batches
-            mean_value_loss /= num_updates
-            mean_surrogate_loss /= num_updates
+        # if log_this_iteration:
+        #     num_updates = self.num_learning_epochs * self.num_mini_batches
+        #     mean_value_loss /= num_updates
+        #     mean_surrogate_loss /= num_updates
 
-        return mean_value_loss, mean_surrogate_loss, locals()
+        # return mean_value_loss, mean_surrogate_loss, locals()
+
