@@ -1,4 +1,4 @@
-seed: 17
+seed: 1
 record_video: yes
 
 environment:
@@ -6,20 +6,26 @@ environment:
 # just testing commenting
   num_envs: 100
   eval_every_n: 200
-  num_threads: 16
+  num_threads: 6
   simulation_dt: 0.0025
   control_dt: 0.01
-  max_time: 4.0
+  max_time: 5.0
   action_std: 0.4
   reward:
     xVelocity:
-      coeff: 2.2
-    yVelocity:
-      coeff: -1.5
-    zVelocity:
       coeff: 1.5
+    xAngular:
+      coeff: -1.0
+    yVelocity:
+      coeff: -6.0
+    yAngular:
+      coeff: -2.9
+    zVelocity:
+      coeff: 1.0
+    zAngular:
+      coeff: -6.5
     torque:
-      coeff: -e-6
+      coeff: -e-5
 
 
 architecture:

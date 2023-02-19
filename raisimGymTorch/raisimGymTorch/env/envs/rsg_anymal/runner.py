@@ -71,12 +71,12 @@ tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first
 
 ppo = PPO.PPO(actor=actor,
               critic=critic,
-              num_envs=cfg['environment']['num_envs'],
+              num_envs=env.num_envs,
               num_transitions_per_env=n_steps,
               num_learning_epochs=4,
               gamma=0.996,
               lam=0.95,
-              num_mini_batches=4,
+              num_mini_batches=5,
               device=device,
               log_dir=saver.data_dir,
               shuffle_batch=False,
@@ -149,6 +149,7 @@ for update in range(1000000):
 
     end = time.time()
 
+    writer.add_scalar('General/dones', average_dones, update)
     writer.add_scalar('General/reward', average_ll_performance, update)
     writer.add_scalar('General/x', x, update)
     writer.add_scalar('General/y', y, update)

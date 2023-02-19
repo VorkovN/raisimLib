@@ -22,29 +22,24 @@ namespace raisim {
             world_ = std::make_unique<raisim::World>();
 
             /// add objects
-            anymal_ = world_->addArticulatedSystem(resourceDir_+"\\aliengo\\aliengo.urdf");
+            anymal_ = world_->addArticulatedSystem(resourceDir_+"/anymal/urdf/anymal.urdf");
             anymal_->setName("anymal");
             anymal_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
             world_->addGround();
 
-            /// stair generation
-            std::srand(std::time(nullptr));
             stepHeight_ = float(std::rand()%13)/100+0.12;
             stepWidth_ = float(std::rand()%5)/100+0.25;
             uint8_t stepCount = 20;
             float mass = 1;
             float stairY = 0;
             float stairWidth = 2;
-            float stairX = 0.4;
+            float stairX = 0.65;
             for (int stepNumber=0; stepNumber < stepCount; ++stepNumber)
             {
                 auto box = world_->addBox(stepWidth_, stairWidth, stepHeight_, mass);
-                box->setPosition(raisim::Vec<3>{stairX+stepNumber*stepWidth_, stairY, stepHeight_*stepNumber});
+                box->setPosition(raisim::Vec<3>{stairX+stepNumber*stepWidth_, stairY, stepHeight_*(stepNumber+0.5)});
                 box->setBodyType(raisim::BodyType::STATIC);
             }
-            targetX_=stairX+stepCount*stepWidth_;
-            targetZ_=stepHeight_*stepCount;
-
             /// get robot data
             gcDim_ = anymal_->getGeneralizedCoordinateDim();
             gvDim_ = anymal_->getDOF();
@@ -79,12 +74,6 @@ namespace raisim {
             /// Reward coefficients
             rewards_.initializeFromConfigurationFile (cfg["reward"]);
 
-            /// indices of links that should not make contact with ground
-            footIndices_.insert(anymal_->getBodyIdx("LF_SHANK"));
-            footIndices_.insert(anymal_->getBodyIdx("RF_SHANK"));
-            footIndices_.insert(anymal_->getBodyIdx("LH_SHANK"));
-            footIndices_.insert(anymal_->getBodyIdx("RH_SHANK"));
-
             /// visualize if it is the first environment
             if (visualizable_) {
                 server_ = std::make_unique<raisim::RaisimServer>(world_.get());
@@ -103,7 +92,7 @@ namespace raisim {
         float step(const Eigen::Ref<EigenVec>& action) final {
             /// action scaling
             pTarget12_ = action.cast<double>();
-            pTarget12_ = pTarget12_.cwiseProduct(actionStd_);
+            pTarget12_ = pTarget12_.cwiseProduct(actionStd_); // тут мы хотим чтобы действие совершалось не до конца
             pTarget12_ += actionMean_;
             pTarget_.tail(nJoints_) = pTarget12_;
 
@@ -118,11 +107,12 @@ namespace raisim {
             updateObservation();
 
             rewards_.record("torque", anymal_->getGeneralizedForce().squaredNorm());
-            rewards_.record("xVelocity", std::min(4.0, bodyLinearVel_[0]));
-//	    rewards_.record("yVelocity", std::max(0.2, std::abs(gc_[1])));
-//	    rewards_.record("yVelocity", std::max(0.01, std::abs(bodyLinearVel_[2])));
-            rewards_.record("yVelocity", std::min(6.0, std::max(0.1, std::abs(bodyAngularVel_[2]))));
-            rewards_.record("zVelocity", std::min(4.0, bodyLinearVel_[2]));
+            rewards_.record("xVelocity", bodyLinearVel_[0]);
+	        rewards_.record("xAngular", std::abs(bodyAngularVel_[0]));
+	        rewards_.record("yVelocity", std::abs(bodyLinearVel_[1]));
+            rewards_.record("yAngular", std::max(0.01, bodyAngularVel_[1]));
+            rewards_.record("zVelocity", bodyLinearVel_[2]);
+            rewards_.record("zAngular", std::abs(bodyAngularVel_[2]));
 
             return rewards_.sum();
         }
@@ -135,7 +125,6 @@ namespace raisim {
             raisim::quatToRotMat(quat, rot);
             bodyLinearVel_ = rot.e().transpose() * gv_.segment(0, 3);
             bodyAngularVel_ = rot.e().transpose() * gv_.segment(3, 3);
-
             obDouble_ <<
                     stepHeight_,
                     stepWidth_,
@@ -147,7 +136,7 @@ namespace raisim {
 
         float getX()
         {
-            return std::abs(gc_[0]/targetX_);
+            return std::abs(gc_[0]);
         }
         float getY()
         {
@@ -155,23 +144,20 @@ namespace raisim {
         }
         float getZ()
         {
-            return std::abs(gc_[2]/targetZ_);
+            return std::abs(gc_[2]);
         }
 
         void observe(Eigen::Ref<EigenVec> ob) final {
-            /// convert it to float
             ob = obDouble_.cast<float>();
         }
 
         bool isTerminalState(float& terminalReward) final {
             terminalReward = float(terminalRewardCoeff_);
 
-            /// if the contact body is not feet
-            for(auto& contact: anymal_->getContacts())
-                if(footIndices_.find(contact.getlocalBodyIndex()) == footIndices_.end())
-                    return true;
+            if (anymal_->getContacts().empty())
+                return true;
 
-            terminalReward = 0.f;
+            terminalReward = 0.0;
             return false;
         }
 
@@ -182,12 +168,9 @@ namespace raisim {
         bool visualizable_ = false;
         raisim::ArticulatedSystem* anymal_;
         Eigen::VectorXd gc_init_, gv_init_, gc_, gv_, pTarget_, pTarget12_, vTarget_;
-        double terminalRewardCoeff_ = -50;
+        double terminalRewardCoeff_ = -150;
         Eigen::VectorXd actionMean_, actionStd_, obDouble_;
         Eigen::Vector3d bodyLinearVel_, bodyAngularVel_;
-        std::set<size_t> footIndices_;
-        float targetX_;
-        float targetZ_;
         float stepHeight_;
         float stepWidth_;
 
