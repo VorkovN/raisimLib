@@ -33,7 +33,7 @@ namespace raisim {
             float mass = 1;
             float stairY = 0;
             float stairWidth = 2;
-            float stairX = 0.65;
+            float stairX = 0.7;
             for (int stepNumber=0; stepNumber < stepCount; ++stepNumber)
             {
                 auto box = world_->addBox(stepWidth_, stairWidth, stepHeight_, mass);
@@ -74,6 +74,11 @@ namespace raisim {
             /// Reward coefficients
             rewards_.initializeFromConfigurationFile (cfg["reward"]);
 
+            /// indices of links that should not make contact with ground
+            footIdLF_ = anymal_->getBodyIdx("LF_SHANK");
+            footIdRF_ = anymal_->getBodyIdx("RF_SHANK");
+            footIdLB_ = anymal_->getBodyIdx("LH_SHANK");
+            footIdRB_ = anymal_->getBodyIdx("RH_SHANK");
             /// visualize if it is the first environment
             if (visualizable_) {
                 server_ = std::make_unique<raisim::RaisimServer>(world_.get());
@@ -106,11 +111,33 @@ namespace raisim {
 
             updateObservation();
 
+            raisim::Vec<3> footPositionLF;
+            anymal_->getFramePosition(footIdLF_, footPositionLF);
+            raisim::Vec<3> footPositionRF;
+            anymal_->getFramePosition(footIdRF_, footPositionRF);
+            raisim::Vec<3> footPositionLB;
+            anymal_->getFramePosition(footIdLB_, footPositionLB);
+            raisim::Vec<3> footPositionRB;
+            anymal_->getFramePosition(footIdRB_, footPositionRB);
+
+            float footDeviationY = footPositionLF[1]*footPositionLF[1]+footPositionRF[1]*footPositionRF[1]+footPositionLB[1]*footPositionLB[1]+footPositionRB[1]*footPositionRB[1];
+            float frontFeetZ = (gc_[2]-footPositionLF[2])*(gc_[2]-footPositionLF[2]) + (gc_[2]-footPositionRF[2])*(gc_[2]-footPositionRF[2]);
+            float backFeetX = (gc_[0]-footPositionLB[0])*(gc_[0]-footPositionLB[0]) + (gc_[2]-footPositionRB[0])*(gc_[0]-footPositionRB[0]);
+
+//            std::cout << "footPositionLF: " << footPositionLF[0] << ", " << footPositionLF[1] << ", " << footPositionLF[2] << std::endl;
+//            std::cout << "footPositionRF: " << footPositionRF[0] << ", " << footPositionRF[1] << ", " << footPositionRF[2] << std::endl;
+//            std::cout << "footPositionLB: " << footPositionLB[0] << ", " << footPositionLB[1] << ", " << footPositionLB[2] << std::endl;
+//            std::cout << "footPositionRB: " << footPositionRB[0] << ", " << footPositionRB[1] << ", " << footPositionRB[2] << std::endl;
+
+            rewards_.record("footDeviationY", footDeviationY);
+            rewards_.record("frontFeetZ", frontFeetZ);
+            rewards_.record("backFeetX", backFeetX);
             rewards_.record("torque", anymal_->getGeneralizedForce().squaredNorm());
             rewards_.record("xVelocity", bodyLinearVel_[0]);
 	        rewards_.record("xAngular", std::abs(bodyAngularVel_[0]));
 	        rewards_.record("yVelocity", std::abs(bodyLinearVel_[1]));
-            rewards_.record("yAngular", std::max(0.01, bodyAngularVel_[1]));
+            rewards_.record("yAngularUp", -bodyAngularVel_[1]);
+            rewards_.record("yAngularDown", std::max(0.1, bodyAngularVel_[1]));
             rewards_.record("zVelocity", bodyLinearVel_[2]);
             rewards_.record("zAngular", std::abs(bodyAngularVel_[2]));
 
@@ -174,6 +201,10 @@ namespace raisim {
         float stepHeight_;
         float stepWidth_;
 
+        size_t footIdLF_;
+        size_t footIdRF_;
+        size_t footIdLB_;
+        size_t footIdRB_;
         /// these variables are not in use. They are placed to show you how to create a random number sampler.
         std::normal_distribution<double> normDist_;
         thread_local static std::mt19937 gen_;

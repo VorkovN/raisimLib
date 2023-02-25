@@ -9,21 +9,29 @@ environment:
   num_threads: 6
   simulation_dt: 0.0025
   control_dt: 0.01
-  max_time: 5.0
+  max_time: 4.0
   action_std: 0.4
   reward:
+    footDeviationY:
+      coeff: 1.0
+    frontFeetZ:
+      coeff: 1.0
+    backFeetX:
+      coeff: 1.0
     xVelocity:
-      coeff: 1.5
+      coeff: 1.2
     xAngular:
       coeff: -1.0
     yVelocity:
-      coeff: -6.0
-    yAngular:
-      coeff: -2.9
+      coeff: -1.5
+    yAngularUp:
+      coeff: 0.02
+    yAngularDown:
+      coeff: -1.5
     zVelocity:
       coeff: 1.0
     zAngular:
-      coeff: -6.5
+      coeff: -4.0
     torque:
       coeff: -e-5
 

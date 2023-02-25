@@ -2,6 +2,7 @@ import torch
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import numpy as np
 
+#тут мы собираем роллауты
 
 class RolloutStorage:
     def __init__(self, num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, actions_shape, device):
