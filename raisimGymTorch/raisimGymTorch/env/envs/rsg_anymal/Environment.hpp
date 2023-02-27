@@ -33,7 +33,7 @@ namespace raisim {
             float mass = 1;
             float stairY = 0;
             float stairWidth = 2;
-            float stairX = 0.7;
+            float stairX = 0.65;
             for (int stepNumber=0; stepNumber < stepCount; ++stepNumber)
             {
                 auto box = world_->addBox(stepWidth_, stairWidth, stepHeight_, mass);
@@ -75,10 +75,10 @@ namespace raisim {
             rewards_.initializeFromConfigurationFile (cfg["reward"]);
 
             /// indices of links that should not make contact with ground
-            footIdLF_ = anymal_->getBodyIdx("LF_SHANK");
-            footIdRF_ = anymal_->getBodyIdx("RF_SHANK");
-            footIdLB_ = anymal_->getBodyIdx("LH_SHANK");
-            footIdRB_ = anymal_->getBodyIdx("RH_SHANK");
+	    footIdLF_ = 9;
+	    footIdRF_ = 13;
+	    footIdLB_ = 17;
+	    footIdRB_ = 21;
             /// visualize if it is the first environment
             if (visualizable_) {
                 server_ = std::make_unique<raisim::RaisimServer>(world_.get());
@@ -120,45 +120,50 @@ namespace raisim {
             raisim::Vec<3> footPositionRB;
             anymal_->getFramePosition(footIdRB_, footPositionRB);
 
-            float footDeviationY = footPositionLF[1]*footPositionLF[1]+footPositionRF[1]*footPositionRF[1]+footPositionLB[1]*footPositionLB[1]+footPositionRB[1]*footPositionRB[1];
-            float frontFeetZ = (gc_[2]-footPositionLF[2])*(gc_[2]-footPositionLF[2]) + (gc_[2]-footPositionRF[2])*(gc_[2]-footPositionRF[2]);
-            float backFeetX = (gc_[0]-footPositionLB[0])*(gc_[0]-footPositionLB[0]) + (gc_[2]-footPositionRB[0])*(gc_[0]-footPositionRB[0]);
+            int dx = 0.481;
+            int dy = 0.245;
 
-//            std::cout << "footPositionLF: " << footPositionLF[0] << ", " << footPositionLF[1] << ", " << footPositionLF[2] << std::endl;
-//            std::cout << "footPositionRF: " << footPositionRF[0] << ", " << footPositionRF[1] << ", " << footPositionRF[2] << std::endl;
-//            std::cout << "footPositionLB: " << footPositionLB[0] << ", " << footPositionLB[1] << ", " << footPositionLB[2] << std::endl;
-//            std::cout << "footPositionRB: " << footPositionRB[0] << ", " << footPositionRB[1] << ", " << footPositionRB[2] << std::endl;
+            float footDeviationY = (gc_[1]+dy-footPositionLF[1])*(gc_[1]+dy-footPositionLF[1])+(gc_[1]-dy-footPositionRF[1])*(gc_[1]-dy-footPositionRF[1])+(gc_[1]+dy-footPositionLB[1])*(gc_[1]+dy-footPositionLB[1])+(gc_[1]-dy-footPositionRB[1])*(gc_[1]-dy-footPositionRB[1]);
+            float frontFeetDX = (gc_[0]+1.5*dx-footPositionLF[0])*(gc_[0]+1.5*dx-footPositionLF[0]) + (gc_[0]+1.5*dx-footPositionRF[0])*(gc_[0]+1.5*dx-footPositionRF[0]);
+            float frontFeetDZ = (gc_[2]-footPositionLF[2])*(gc_[2]-footPositionLF[2]) + (gc_[2]-footPositionRF[2])*(gc_[2]-footPositionRF[2]);  
+            float backFeetDX = (gc_[0]-dx-footPositionLB[0])*(gc_[0]-dx-footPositionLB[0]) + (gc_[0]-dx-footPositionRB[0])*(gc_[0]-dx-footPositionRB[0]);
+
+            std::cout << "x: " << bodyLinearVel_[0] << std::endl;
+            std::cout << "y: " << bodyLinearVel_[1] << std::endl;
+            std::cout << "z: " << bodyLinearVel_[2] << std::endl;
 
             rewards_.record("footDeviationY", footDeviationY);
-            rewards_.record("frontFeetZ", frontFeetZ);
-            rewards_.record("backFeetX", backFeetX);
+            rewards_.record("frontFeetDX", frontFeetDX);
+            rewards_.record("frontFeetDZ", frontFeetDZ);
+            rewards_.record("backFeetDX", backFeetDX);
             rewards_.record("torque", anymal_->getGeneralizedForce().squaredNorm());
-            rewards_.record("xVelocity", bodyLinearVel_[0]);
-	        rewards_.record("xAngular", std::abs(bodyAngularVel_[0]));
-	        rewards_.record("yVelocity", std::abs(bodyLinearVel_[1]));
+            rewards_.record("xVelocity", std::min(0.25, bodyLinearVel_[0]));
+	        rewards_.record("xAngular", bodyAngularVel_[0]*bodyAngularVel_[0]);
+	        rewards_.record("yVelocity", bodyLinearVel_[1]*bodyLinearVel_[1]);
             rewards_.record("yAngularUp", -bodyAngularVel_[1]);
             rewards_.record("yAngularDown", std::max(0.1, bodyAngularVel_[1]));
             rewards_.record("zVelocity", bodyLinearVel_[2]);
-            rewards_.record("zAngular", std::abs(bodyAngularVel_[2]));
+            rewards_.record("zAngular", bodyAngularVel_[2]*bodyAngularVel_[2]);
 
             return rewards_.sum();
         }
 
         void updateObservation() {
             anymal_->getState(gc_, gv_);
-            raisim::Vec<4> quat;
-            raisim::Mat<3,3> rot;
-            quat[0] = gc_[3]; quat[1] = gc_[4]; quat[2] = gc_[5]; quat[3] = gc_[6];
-            raisim::quatToRotMat(quat, rot);
-            bodyLinearVel_ = rot.e().transpose() * gv_.segment(0, 3);
-            bodyAngularVel_ = rot.e().transpose() * gv_.segment(3, 3);
+//            raisim::Vec<4> quat;
+//            raisim::Mat<3,3> rot;
+//            quat[0] = gc_[3]; quat[1] = gc_[4]; quat[2] = gc_[5]; quat[3] = gc_[6];
+//            raisim::quatToRotMat(quat, rot);
+//            bodyLinearVel_ = rot.e().transpose() * gv_.segment(0, 3);
+//            bodyAngularVel_ = rot.e().transpose() * gv_.segment(3, 3);
             obDouble_ <<
                     stepHeight_,
                     stepWidth_,
-                    rot.e().row(2).transpose(), /// body orientation
-                    gc_.tail(12), /// joint angles
-                    bodyLinearVel_, bodyAngularVel_, /// body linear&angular velocity
-                    gv_.tail(12); /// joint velocity
+                    gc_, /// joint angles
+                    gv_; /// joint velocity
+//                    rot.e().row(2).transpose(), /// body orientation
+//                    bodyLinearVel_, bodyAngularVel_, /// body linear&angular velocity
+
         }
 
         float getX()
@@ -195,7 +200,7 @@ namespace raisim {
         bool visualizable_ = false;
         raisim::ArticulatedSystem* anymal_;
         Eigen::VectorXd gc_init_, gv_init_, gc_, gv_, pTarget_, pTarget12_, vTarget_;
-        double terminalRewardCoeff_ = -150;
+        double terminalRewardCoeff_ = -200;
         Eigen::VectorXd actionMean_, actionStd_, obDouble_;
         Eigen::Vector3d bodyLinearVel_, bodyAngularVel_;
         float stepHeight_;

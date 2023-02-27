@@ -80,6 +80,12 @@ memory = ReplayMemory(args.replay_size, seed)
 updates = 0
 
 for update in range(1000000):
+    if update % cfg['environment']['eval_every_n'] == 0:
+        env.turn_on_visualization()
+
+    if update % cfg['environment']['eval_every_n'] == 1:
+        env.turn_off_visualization()
+
     start = time.time()
     env.reset()
     reward_ll_sum = 0
