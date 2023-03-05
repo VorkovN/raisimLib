@@ -6,7 +6,7 @@ environment:
 # just testing commenting
   num_envs: 96
   eval_every_n: 200
-  num_threads: 16
+  num_threads: 6
   simulation_dt: 0.0025
   control_dt: 0.01
   max_time: 4.0
@@ -19,19 +19,19 @@ environment:
     frontFeetDZ:
       coeff: -0.8
     backFeetDX:
-      coeff: -0.6
+      coeff: -1.6
+    backFeetDZ:
+      coeff: 0.9
     xVelocity:
-      coeff: 2.5
+      coeff: 6.5
     xAngular:
       coeff: -1.5
     yVelocity:
       coeff: -1.5
-    yAngularUp:
-      coeff: 0.4
-    yAngularDown:
-      coeff: -0.8
+    yAngular:
+      coeff: -8.0
     zVelocity:
-      coeff: 1.6
+      coeff: 1.5
     zAngular:
       coeff: -3.5
     torque:
@@ -39,5 +39,5 @@ environment:
 
 
 architecture:
-  policy_net: [256, 256]
-  value_net: [256, 256]
+  policy_net: [128, 128]
+  value_net: [128, 128]
