@@ -2,6 +2,7 @@ import torch
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import numpy as np
 
+#тут мы собираем роллауты
 
 class RolloutStorage:
     def __init__(self, num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, actions_shape, device):
@@ -64,10 +65,8 @@ class RolloutStorage:
         for step in reversed(range(self.num_transitions_per_env)):
             if step == self.num_transitions_per_env - 1:
                 next_values = last_values.cpu().numpy()
-                # next_is_not_terminal = 1.0 - self.dones[step].float()
             else:
                 next_values = self.values[step + 1]
-                # next_is_not_terminal = 1.0 - self.dones[step+1].float()
 
             next_is_not_terminal = 1.0 - self.dones[step]
             delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - self.values[step]

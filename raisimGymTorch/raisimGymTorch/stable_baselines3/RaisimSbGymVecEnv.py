@@ -55,6 +55,9 @@ class RaisimSbGymVecEnv(VecEnv):
     def step_async(self, actions: np.ndarray) -> None:
         self.actions = actions
 
+    def getCoords(self):
+        return self.wrapper.getX(), self.wrapper.getY(), self.wrapper.getZ()
+
     def step_wait(self):
         self.wrapper.step(self.actions, self._reward, self._done)
         return self.observe(self.normalize_ob).copy(), self._reward.copy(), self._done.copy(), self._info

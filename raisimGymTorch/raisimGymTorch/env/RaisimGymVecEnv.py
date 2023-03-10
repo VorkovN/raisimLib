@@ -67,6 +67,9 @@ class RaisimGymVecEnv:
         self.wrapper.observe(self._observation, update_statistics)
         return self._observation
 
+    def getCoords(self):
+        return self.wrapper.getX(), self.wrapper.getY(), self.wrapper.getZ()
+
     def reset(self):
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
         self.wrapper.reset()

@@ -11,150 +11,223 @@
 
 namespace raisim {
 
-class ENVIRONMENT : public RaisimGymEnv {
+    class ENVIRONMENT : public RaisimGymEnv {
 
- public:
+    public:
 
-  explicit ENVIRONMENT(const std::string& resourceDir, const Yaml::Node& cfg, bool visualizable) :
-      RaisimGymEnv(resourceDir, cfg), visualizable_(visualizable), normDist_(0, 1) {
+        explicit ENVIRONMENT(const std::string& resourceDir, const Yaml::Node& cfg, bool visualizable) :
+                RaisimGymEnv(resourceDir, cfg), visualizable_(visualizable), normDist_(0, 1) {
 
-    /// create world
-    world_ = std::make_unique<raisim::World>();
+            /// create world
+            world_ = std::make_unique<raisim::World>();
 
-    /// add objects
-    anymal_ = world_->addArticulatedSystem(resourceDir_+"/anymal/urdf/anymal.urdf");
-    anymal_->setName("anymal");
-    anymal_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
-    world_->addGround();
+            /// add objects
+            anymal_ = world_->addArticulatedSystem(resourceDir_+"/anymal/urdf/anymal.urdf");
+            anymal_->setName("anymal");
+            anymal_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
+            world_->addGround();
 
-    /// get robot data
-    gcDim_ = anymal_->getGeneralizedCoordinateDim();
-    gvDim_ = anymal_->getDOF();
-    nJoints_ = gvDim_ - 6;
+            stepHeight_ = float(std::rand()%13)/100+0.12;
+            stepWidth_ = float(std::rand()%5)/100+0.25;
+            uint8_t stepCount = 20;
+            float mass = 1;
+            float stairY = 0;
+            float stairWidth = 2;
+            float stairX = 0.65;
+            for (int stepNumber=0; stepNumber < stepCount; ++stepNumber)
+            {
+                auto box = world_->addBox(stepWidth_, stairWidth, stepHeight_, mass);
+                box->setPosition(raisim::Vec<3>{stairX+stepNumber*stepWidth_, stairY, stepHeight_*(stepNumber+0.5)});
+                box->setBodyType(raisim::BodyType::STATIC);
+            }
+            targetAngularY_ = -2*atan(stepHeight_/stepWidth_)/3.14*0.1;
 
-    /// initialize containers
-    gc_.setZero(gcDim_); gc_init_.setZero(gcDim_);
-    gv_.setZero(gvDim_); gv_init_.setZero(gvDim_);
-    pTarget_.setZero(gcDim_); vTarget_.setZero(gvDim_); pTarget12_.setZero(nJoints_);
+            /// get robot data
+            gcDim_ = anymal_->getGeneralizedCoordinateDim();
+            gvDim_ = anymal_->getDOF();
+            nJoints_ = gvDim_ - 6;
 
-    /// this is nominal configuration of anymal
-    gc_init_ << 0, 0, 0.50, 1.0, 0.0, 0.0, 0.0, 0.03, 0.4, -0.8, -0.03, 0.4, -0.8, 0.03, -0.4, 0.8, -0.03, -0.4, 0.8;
+            /// initialize containers
+            gc_.setZero(gcDim_); gc_init_.setZero(gcDim_);
+            gv_.setZero(gvDim_); gv_init_.setZero(gvDim_);
+            pTarget_.setZero(gcDim_); vTarget_.setZero(gvDim_); pTarget12_.setZero(nJoints_);
 
-    /// set pd gains
-    Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
-    jointPgain.setZero(); jointPgain.tail(nJoints_).setConstant(50.0);
-    jointDgain.setZero(); jointDgain.tail(nJoints_).setConstant(0.2);
-    anymal_->setPdGains(jointPgain, jointDgain);
-    anymal_->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
+            /// this is nominal configuration of anymal
+            gc_init_ << 0, 0, 0.50, 1.0, 0.0, 0.0, 0.0, 0.03, 0.4, -0.8, -0.03, 0.4, -0.8, 0.03, -0.4, 0.8, -0.03, -0.4, 0.8;
 
-    /// MUST BE DONE FOR ALL ENVIRONMENTS
-    obDim_ = 34;
-    actionDim_ = nJoints_; actionMean_.setZero(actionDim_); actionStd_.setZero(actionDim_);
-    obDouble_.setZero(obDim_);
+            /// set pd gains
+            Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
+            jointPgain.setZero(); jointPgain.tail(nJoints_).setConstant(50.0);
+            jointDgain.setZero(); jointDgain.tail(nJoints_).setConstant(0.2);
+            anymal_->setPdGains(jointPgain, jointDgain);
+            anymal_->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
 
-    /// action scaling
-    actionMean_ = gc_init_.tail(nJoints_);
-    double action_std;
-    READ_YAML(double, action_std, cfg_["action_std"]) /// example of reading params from the config
-    actionStd_.setConstant(action_std);
+            /// MUST BE DONE FOR ALL ENVIRONMENTS
+//            obDim_ = 38;
+            obDim_ = 20;
+            actionDim_ = nJoints_; actionMean_.setZero(actionDim_); actionStd_.setZero(actionDim_);
+            obDouble_.setZero(obDim_);
 
-    /// Reward coefficients
-    rewards_.initializeFromConfigurationFile (cfg["reward"]);
+            /// action scaling
+            actionMean_ = gc_init_.tail(nJoints_);
+            double action_std;
+            READ_YAML(double, action_std, cfg_["action_std"]) /// example of reading params from the config
+            actionStd_.setConstant(action_std);
 
-    /// indices of links that should not make contact with ground
-    footIndices_.insert(anymal_->getBodyIdx("LF_SHANK"));
-    footIndices_.insert(anymal_->getBodyIdx("RF_SHANK"));
-    footIndices_.insert(anymal_->getBodyIdx("LH_SHANK"));
-    footIndices_.insert(anymal_->getBodyIdx("RH_SHANK"));
+            /// Reward coefficients
+            rewards_.initializeFromConfigurationFile (cfg["reward"]);
 
-    /// visualize if it is the first environment
-    if (visualizable_) {
-      server_ = std::make_unique<raisim::RaisimServer>(world_.get());
-      server_->launchServer();
-      server_->focusOn(anymal_);
-    }
-  }
+            /// indices of links that should not make contact with ground
+            bodyId_ = 0;
+            footIdLF_ = 9;
+            footIdRF_ = 13;
+            footIdLB_ = 17;
+            footIdRB_ = 21;
+            /// visualize if it is the first environment
+            if (visualizable_) {
+                server_ = std::make_unique<raisim::RaisimServer>(world_.get());
+                server_->launchServer();
+                server_->focusOn(anymal_);
+            }
+        }
 
-  void init() final { }
+        void init() final { }
 
-  void reset() final {
-    anymal_->setState(gc_init_, gv_init_);
-    updateObservation();
-  }
+        void reset() final {
+            anymal_->setState(gc_init_, gv_init_);
+            updateObservation();
+        }
 
-  float step(const Eigen::Ref<EigenVec>& action) final {
-    /// action scaling
-    pTarget12_ = action.cast<double>();
-    pTarget12_ = pTarget12_.cwiseProduct(actionStd_);
-    pTarget12_ += actionMean_;
-    pTarget_.tail(nJoints_) = pTarget12_;
+        float step(const Eigen::Ref<EigenVec>& action) final {
+            /// action scaling
+            pTarget12_ = action.cast<double>();
+            pTarget12_ = pTarget12_.cwiseProduct(actionStd_); // тут мы хотим чтобы действие совершалось не до конца
+            pTarget12_ += actionMean_;
+            pTarget_.tail(nJoints_) = pTarget12_;
 
-    anymal_->setPdTarget(pTarget_, vTarget_);
+            anymal_->setPdTarget(pTarget_, vTarget_);
 
-    for(int i=0; i< int(control_dt_ / simulation_dt_ + 1e-10); i++){
-      if(server_) server_->lockVisualizationServerMutex();
-      world_->integrate();
-      if(server_) server_->unlockVisualizationServerMutex();
-    }
+            for(int i=0; i< int(control_dt_ / simulation_dt_ + 1e-10); i++){
+                if(server_) server_->lockVisualizationServerMutex();
+                world_->integrate();
+                if(server_) server_->unlockVisualizationServerMutex();
+            }
 
-    updateObservation();
+            updateObservation();
 
-    rewards_.record("torque", anymal_->getGeneralizedForce().squaredNorm());
-    rewards_.record("forwardVel", std::min(4.0, bodyLinearVel_[0]));
+            raisim::Vec<3> footPositionLF;
+            anymal_->getFramePosition(footIdLF_, footPositionLF);
+            raisim::Vec<3> footPositionRF;
+            anymal_->getFramePosition(footIdRF_, footPositionRF);
+            raisim::Vec<3> footPositionLB;
+            anymal_->getFramePosition(footIdLB_, footPositionLB);
+            raisim::Vec<3> footPositionRB;
+            anymal_->getFramePosition(footIdRB_, footPositionRB);
 
-    return rewards_.sum();
-  }
+            float footDeviationY = (gc_[1]+dy_-footPositionLF[1])*(gc_[1]+dy_-footPositionLF[1])+(gc_[1]-dy_-footPositionRF[1])*(gc_[1]-dy_-footPositionRF[1])+(gc_[1]+dy_-footPositionLB[1])*(gc_[1]+dy_-footPositionLB[1])+(gc_[1]-dy_-footPositionRB[1])*(gc_[1]-dy_-footPositionRB[1]);
+            float frontFeetDX = (gc_[0]+1.5*dx_-footPositionLF[0])*(gc_[0]+1.5*dx_-footPositionLF[0]) + (gc_[0]+1.5*dx_-footPositionRF[0])*(gc_[0]+1.5*dx_-footPositionRF[0]);
+            float frontFeetDZ = (gc_[2]-footPositionLF[2])*(gc_[2]-footPositionLF[2]) + (gc_[2]-footPositionRF[2])*(gc_[2]-footPositionRF[2]);  
+            float backFeetDX = (gc_[0]-dx_-footPositionLB[0])*(gc_[0]-dx_-footPositionLB[0]) + (gc_[0]-dx_-footPositionRB[0])*(gc_[0]-dx_-footPositionRB[0]);
+            float backFeetDZ = (gc_[2]-footPositionLB[2])*(gc_[2]-footPositionLB[2]) + (gc_[2]-footPositionRB[2])*(gc_[2]-footPositionRB[2]);
 
-  void updateObservation() {
-    anymal_->getState(gc_, gv_);
-    raisim::Vec<4> quat;
-    raisim::Mat<3,3> rot;
-    quat[0] = gc_[3]; quat[1] = gc_[4]; quat[2] = gc_[5]; quat[3] = gc_[6];
-    raisim::quatToRotMat(quat, rot);
-    bodyLinearVel_ = rot.e().transpose() * gv_.segment(0, 3);
-    bodyAngularVel_ = rot.e().transpose() * gv_.segment(3, 3);
+            rewards_.record("footDeviationY", footDeviationY);
+            rewards_.record("frontFeetDX", frontFeetDX);
+            rewards_.record("frontFeetDZ", frontFeetDZ);
+            rewards_.record("backFeetDX", backFeetDX);
+            rewards_.record("backFeetDZ", backFeetDZ);
+            rewards_.record("torque", anymal_->getGeneralizedForce().squaredNorm());
+            rewards_.record("xVelocity", std::min(0.25, gv_[0]));
+	        rewards_.record("xAngular", gv_[3]*gv_[3]);
+	        rewards_.record("yVelocity", gv_[1]*gv_[1]);
+            rewards_.record("yAngular", (gc_[5]/gc_[3]-targetAngularY_)*(gc_[5]/gc_[3]-targetAngularY_));
+            rewards_.record("zVelocity", gv_[2]);
+            rewards_.record("zAngular", gv_[5]*gv_[5]);
 
-    obDouble_ << gc_[2], /// body height
-        rot.e().row(2).transpose(), /// body orientation
-        gc_.tail(12), /// joint angles
-        bodyLinearVel_, bodyAngularVel_, /// body linear&angular velocity
-        gv_.tail(12); /// joint velocity
-  }
+            return rewards_.sum();
+        }
 
-  void observe(Eigen::Ref<EigenVec> ob) final {
-    /// convert it to float
-    ob = obDouble_.cast<float>();
-  }
+        void updateObservation() {
+            anymal_->getState(gc_, gv_);
+//            obDouble_ << stepHeight_, stepWidth_, gv_, gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
+            obDouble_ << stepHeight_, stepWidth_, gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
 
-  bool isTerminalState(float& terminalReward) final {
-    terminalReward = float(terminalRewardCoeff_);
+        }
 
-    /// if the contact body is not feet
-    for(auto& contact: anymal_->getContacts())
-      if(footIndices_.find(contact.getlocalBodyIndex()) == footIndices_.end())
-        return true;
+        float getX()
+        {
+            return std::abs(gc_[0]);
+        }
+        float getY()
+        {
+            return std::abs(gc_[1]);
+        }
+        float getZ()
+        {
+            return std::abs(gc_[2]);
+        }
 
-    terminalReward = 0.f;
-    return false;
-  }
+        void observe(Eigen::Ref<EigenVec> ob) final {
+            ob = obDouble_.cast<float>();
+        }
 
-  void curriculumUpdate() { };
+        bool isTerminalState(float& terminalReward) final {
+            terminalReward = float(terminalRewardCoeff_);
 
- private:
-  int gcDim_, gvDim_, nJoints_;
-  bool visualizable_ = false;
-  raisim::ArticulatedSystem* anymal_;
-  Eigen::VectorXd gc_init_, gv_init_, gc_, gv_, pTarget_, pTarget12_, vTarget_;
-  double terminalRewardCoeff_ = -10.;
-  Eigen::VectorXd actionMean_, actionStd_, obDouble_;
-  Eigen::Vector3d bodyLinearVel_, bodyAngularVel_;
-  std::set<size_t> footIndices_;
+            if (anymal_->getContacts().empty())
+                return true;
 
-  /// these variables are not in use. They are placed to show you how to create a random number sampler.
-  std::normal_distribution<double> normDist_;
-  thread_local static std::mt19937 gen_;
-};
-thread_local std::mt19937 raisim::ENVIRONMENT::gen_;
+            bool isFootContactLF = false;
+            bool isFootContactRF = false;
+            bool isFootContactLB = false;
+            bool isFootContactRB = false;
+
+            for(auto& contact: anymal_->getContacts())
+            {
+                if (contact.getlocalBodyIndex() == bodyId_)
+                    return true;
+
+                if (contact.getlocalBodyIndex() == footIdLF_)
+                    isFootContactLF = true;
+                if (contact.getlocalBodyIndex() == footIdRF_)
+                    isFootContactRF = true;
+                if (contact.getlocalBodyIndex() == footIdLB_)
+                    isFootContactLB = true;
+                if (contact.getlocalBodyIndex() == footIdRB_)
+                    isFootContactRB = true;
+            }
+
+            terminalReward = 0.0;
+
+            if (!isFootContactLF && !isFootContactRF || !isFootContactLB && !isFootContactRB)
+                terminalReward = float(terminalRewardCoeff_)/10;
+
+            return false;
+        }
+
+        void curriculumUpdate() { };
+
+    private:
+        int gcDim_, gvDim_, nJoints_;
+        bool visualizable_ = false;
+        raisim::ArticulatedSystem* anymal_;
+        Eigen::VectorXd gc_init_, gv_init_, gc_, gv_, pTarget_, pTarget12_, vTarget_;
+        double terminalRewardCoeff_ = -150;
+        Eigen::VectorXd actionMean_, actionStd_, obDouble_;
+        float stepHeight_;
+        float stepWidth_;
+        float targetAngularY_;
+        float dx_ = 0.481;
+        float dy_ = 0.245;
+        size_t bodyId_;
+        size_t footIdLF_;
+        size_t footIdRF_;
+        size_t footIdLB_;
+        size_t footIdRB_;
+
+        /// these variables are not in use. They are placed to show you how to create a random number sampler.
+        std::normal_distribution<double> normDist_;
+        thread_local static std::mt19937 gen_;
+    };
+    thread_local std::mt19937 raisim::ENVIRONMENT::gen_;
 
 }
-
