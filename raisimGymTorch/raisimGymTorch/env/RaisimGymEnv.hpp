@@ -30,9 +30,6 @@ class RaisimGymEnv {
   virtual void init() = 0;
   virtual void reset() = 0;
   virtual void observe(Eigen::Ref<EigenVec> ob) = 0;
-  virtual float getX() = 0;
-  virtual float getY() = 0;
-  virtual float getZ() = 0;
   virtual float step(const Eigen::Ref<EigenVec>& action) = 0;
   virtual bool isTerminalState(float& terminalReward) = 0;
   ////////////////////////////////////////

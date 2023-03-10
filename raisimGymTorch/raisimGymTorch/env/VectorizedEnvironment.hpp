@@ -87,27 +87,10 @@ class VectorizedEnvironment {
       updateObservationStatisticsAndNormalize(ob, updateStatistics);
   }
 
-  float getX() {
-    float sum = 0.;
-    for (int i = 0; i < num_envs_; i++)
-      sum += environments_[i]->getX();
-    return sum/num_envs_;
-  }
-  float getY() {
-    float sum = 0.;
-    for (int i = 0; i < num_envs_; i++)
-      sum += environments_[i]->getY();
-    return sum/num_envs_;
-  }
-  float getZ() {
-    float sum = 0.;
-    for (int i = 0; i < num_envs_; i++)
-      sum += environments_[i]->getZ();
-    return sum/num_envs_;
-  }
 
-
-  void step(Eigen::Ref<EigenRowMajorMat> &action, Eigen::Ref<EigenVec> &reward, Eigen::Ref<EigenBoolVec> &done) {
+  void step(Eigen::Ref<EigenRowMajorMat> &action,
+            Eigen::Ref<EigenVec> &reward,
+            Eigen::Ref<EigenBoolVec> &done) {
 #pragma omp parallel for schedule(auto)
     for (int i = 0; i < num_envs_; i++)
       perAgentStep(i, action, reward, done);

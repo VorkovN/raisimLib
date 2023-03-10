@@ -4,39 +4,18 @@ record_video: yes
 environment:
   render: True
 # just testing commenting
-  num_envs: 96
+  num_envs: 100
   eval_every_n: 200
-  num_threads: 6
+  num_threads: 30
   simulation_dt: 0.0025
   control_dt: 0.01
   max_time: 4.0
   action_std: 0.3
   reward:
-    footDeviationY:
-      coeff: -1.0
-    frontFeetDX:
-      coeff: -2.0
-    frontFeetDZ:
-      coeff: -0.8
-    backFeetDX:
-      coeff: -1.6
-    backFeetDZ:
-      coeff: 0.9
-    xVelocity:
-      coeff: 6.5
-    xAngular:
-      coeff: -1.5
-    yVelocity:
-      coeff: -1.5
-    yAngular:
-      coeff: -8.0
-    zVelocity:
-      coeff: 1.5
-    zAngular:
-      coeff: -3.5
+    forwardVel:
+      coeff: 0.3
     torque:
-      coeff: -e-5
-
+      coeff: -4e-5
 
 architecture:
   policy_net: [128, 128]

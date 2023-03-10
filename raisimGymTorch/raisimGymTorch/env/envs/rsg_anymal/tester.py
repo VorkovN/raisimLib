@@ -49,10 +49,7 @@ else:
 
     print("Visualizing and evaluating the policy: ", weight_path)
     loaded_graph = ppo_module.MLP(cfg['architecture']['policy_net'], torch.nn.LeakyReLU, ob_dim, act_dim)
-    if torch.cuda.is_available():
-        loaded_graph.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
-    else:
-        loaded_graph.load_state_dict(torch.load(weight_path, map_location=torch.device('cpu'))['actor_architecture_state_dict'])
+    loaded_graph.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
 
     env.load_scaling(weight_dir, int(iteration_number))
     env.turn_on_visualization()
