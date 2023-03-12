@@ -1,0 +1,155 @@
+from ruamel.yaml import YAML, dump, RoundTripDumper
+from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
+from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
+from raisimGymTorch.env.bin.anymal_climbing import NormalSampler
+from raisimGymTorch.env.bin.anymal_climbing import RaisimGymEnv
+import os
+import math
+import time
+import raisimGymTorch.algo.ppo.module as ppo_module
+import raisimGymTorch.algo.ppo.ppo as PPO
+import torch.nn as nn
+import numpy as np
+import torch
+import datetime
+import argparse
+from torch.utils.tensorboard import SummaryWriter
+
+
+# task specification
+task_name = "anymal_locomotion"
+
+# configuration
+parser = argparse.ArgumentParser()
+parser.add_argument('-m', '--mode', help='set mode either train or test', type=str, default='train')
+parser.add_argument('-w', '--weight', help='pre-trained weight path', type=str, default='')
+args = parser.parse_args()
+mode = args.mode
+weight_path = args.weight
+
+# check if gpu is available
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+# directories
+task_path = os.path.dirname(os.path.realpath(__file__))
+home_path = task_path + "/../../../../.."
+
+# config
+cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
+
+# create environment from the configuration file
+env = VecEnv(RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)))
+env.seed(cfg['seed'])
+
+# shortcuts
+ob_dim = env.num_obs
+act_dim = env.num_acts
+num_threads = cfg['environment']['num_threads']
+
+# Training
+n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
+total_steps = n_steps * env.num_envs
+
+avg_rewards = []
+
+actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim, act_dim),
+                         ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
+                                                                           env.num_envs,
+                                                                           1.0,
+                                                                           NormalSampler(act_dim),
+                                                                           cfg['seed']),
+                         device)
+critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['value_net'], nn.LeakyReLU, ob_dim, 1), device)
+
+saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/"+task_name,
+                           save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp"])
+
+log_dir = os.path.join(saver.data_dir, datetime.datetime.now().strftime('%b%d_%H-%M-%S'))
+writer = SummaryWriter(log_dir=log_dir, flush_secs=10)
+tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
+
+ppo = PPO.PPO(actor=actor,
+              critic=critic,
+              num_envs=env.num_envs,
+              num_transitions_per_env=n_steps,
+              num_learning_epochs=4,
+              gamma=0.997,
+              lam=0.95,
+              num_mini_batches=4,
+              device=device,
+              log_dir=saver.data_dir,
+              shuffle_batch=False,
+              )
+
+if mode == 'retrain':
+    load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
+
+for update in range(1000000):
+    start = time.time()
+    env.reset()
+    reward_ll_sum = 0
+    done_sum = 0
+    average_dones = 0.
+
+    if update % cfg['environment']['eval_every_n'] == 0:
+        print("Visualizing and evaluating the current policy")
+        torch.save({
+            'actor_architecture_state_dict': actor.architecture.state_dict(),
+            'actor_distribution_state_dict': actor.distribution.state_dict(),
+            'critic_architecture_state_dict': critic.architecture.state_dict(),
+            'optimizer_state_dict': ppo.optimizer.state_dict(),
+        }, saver.data_dir+"/full_"+str(update)+'.pt')
+        # we create another graph just to demonstrate the save/load method
+        loaded_graph = ppo_module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim, act_dim)
+        loaded_graph.load_state_dict(torch.load(saver.data_dir+"/full_"+str(update)+'.pt')['actor_architecture_state_dict'])
+
+        env.turn_on_visualization()
+        env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
+
+        for step in range(n_steps*2):
+            with torch.no_grad():
+                frame_start = time.time()
+                obs = env.observe(False)
+                action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
+                reward_ll, dones = env.step(action_ll.cpu().detach().numpy())
+                frame_end = time.time()
+                wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
+                if wait_time > 0.:
+                    time.sleep(wait_time)
+
+        env.stop_video_recording()
+        env.turn_off_visualization()
+
+        env.reset()
+        env.save_scaling(saver.data_dir, str(update))
+
+    # actual training
+    for step in range(n_steps):
+        obs = env.observe()
+        action = ppo.act(obs)
+        reward, dones = env.step(action)
+        ppo.step(value_obs=obs, rews=reward, dones=dones)
+        done_sum = done_sum + np.sum(dones)
+        reward_ll_sum = reward_ll_sum + np.sum(reward)
+
+    # take st step to get value obs
+    x, y, z = env.getCoords()
+    obs = env.observe()
+    ppo.update(value_obs=obs)
+    average_ll_performance = reward_ll_sum / total_steps
+    average_dones = done_sum / total_steps
+    avg_rewards.append(average_ll_performance)
+
+    actor.update()
+    actor.distribution.enforce_minimum_std((torch.ones(12)*0.2).to(device))
+
+    # curriculum update. Implement it in Environment.hpp
+    env.curriculum_callback()
+    end = time.time()
+
+    writer.add_scalar('General/dones', average_dones, update)
+    writer.add_scalar('General/reward', average_ll_performance, update)
+    writer.add_scalar('General/x', x, update)
+    writer.add_scalar('General/y', y, update)
+    writer.add_scalar('General/z', z, update)
+    print("Iteration: ", update, "; Real time factor: ", total_steps/(end-start)*cfg['environment']['control_dt'])

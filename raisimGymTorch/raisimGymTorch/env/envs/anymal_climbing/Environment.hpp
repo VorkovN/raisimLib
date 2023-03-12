@@ -22,25 +22,25 @@ namespace raisim {
             world_ = std::make_unique<raisim::World>();
 
             /// add objects
-            anymal_ = world_->addArticulatedSystem(resourceDir_+"/anymal/urdf/anymal.urdf");
+            anymal_ = world_->addArticulatedSystem(resourceDir_+"/aliengo/aliengo.urdf");
             anymal_->setName("anymal");
             anymal_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
             world_->addGround();
 
-            stepHeight_ = float(std::rand()%13)/100+0.12;
+            stepHeight_ = float(std::rand()%8)/100+0.12;
             stepWidth_ = float(std::rand()%5)/100+0.25;
-            uint8_t stepCount = 20;
+            uint8_t stepCount = 10;
             float mass = 1;
             float stairY = 0;
-            float stairWidth = 2;
-            float stairX = 0.65;
+            float stairWidth = 1.5;
+            float stairX = dx_+stepWidth_/2;
             for (int stepNumber=0; stepNumber < stepCount; ++stepNumber)
             {
                 auto box = world_->addBox(stepWidth_, stairWidth, stepHeight_, mass);
                 box->setPosition(raisim::Vec<3>{stairX+stepNumber*stepWidth_, stairY, stepHeight_*(stepNumber+0.5)});
                 box->setBodyType(raisim::BodyType::STATIC);
             }
-            targetAngularY_ = -2*atan(stepHeight_/stepWidth_)/3.14*0.1;
+            targetAngularY_ = -2*atan(stepHeight_/stepWidth_)/3.14*1.2;
 
             /// get robot data
             gcDim_ = anymal_->getGeneralizedCoordinateDim();
@@ -53,12 +53,12 @@ namespace raisim {
             pTarget_.setZero(gcDim_); vTarget_.setZero(gvDim_); pTarget12_.setZero(nJoints_);
 
             /// this is nominal configuration of anymal
-            gc_init_ << 0, 0, 0.50, 1.0, 0.0, 0.0, 0.0, 0.03, 0.4, -0.8, -0.03, 0.4, -0.8, 0.03, -0.4, 0.8, -0.03, -0.4, 0.8;
+            gc_init_ << 0.0, 0.0, 0.375, 1.0, 0.0, 0.0, 0.0, 0.0, 0.9, -1.5, 0.0, 0.9, -1.5, 0.0, 0.9, -1.5, 0.0, 0.9, -1.5;
 
             /// set pd gains
             Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
-            jointPgain.setZero(); jointPgain.tail(nJoints_).setConstant(50.0);
-            jointDgain.setZero(); jointDgain.tail(nJoints_).setConstant(0.2);
+            jointPgain.setZero(); jointPgain.tail(nJoints_).setConstant(55.0);
+            jointDgain.setZero(); jointDgain.tail(nJoints_).setConstant(0.8);
             anymal_->setPdGains(jointPgain, jointDgain);
             anymal_->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
 
@@ -77,12 +77,6 @@ namespace raisim {
             /// Reward coefficients
             rewards_.initializeFromConfigurationFile (cfg["reward"]);
 
-            /// indices of links that should not make contact with ground
-            bodyId_ = 0;
-            footIdLF_ = 9;
-            footIdRF_ = 13;
-            footIdLB_ = 17;
-            footIdRB_ = 21;
             /// visualize if it is the first environment
             if (visualizable_) {
                 server_ = std::make_unique<raisim::RaisimServer>(world_.get());
@@ -183,23 +177,27 @@ namespace raisim {
 
             for(auto& contact: anymal_->getContacts())
             {
-                if (contact.getlocalBodyIndex() == bodyId_)
+//                std::cout << contact.getlocalBodyIndex() << std::endl;
+                if (contact.getlocalBodyIndex() == 0)
                     return true;
 
-                if (contact.getlocalBodyIndex() == footIdLF_)
+                if (contact.getlocalBodyIndex() == footIdLF_ - 6) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
                     isFootContactLF = true;
-                if (contact.getlocalBodyIndex() == footIdRF_)
+                if (contact.getlocalBodyIndex() == footIdRF_ - 6) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
                     isFootContactRF = true;
-                if (contact.getlocalBodyIndex() == footIdLB_)
+                if (contact.getlocalBodyIndex() == footIdLB_ - 6) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
                     isFootContactLB = true;
-                if (contact.getlocalBodyIndex() == footIdRB_)
+                if (contact.getlocalBodyIndex() == footIdRB_ - 6) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
                     isFootContactRB = true;
             }
 
             terminalReward = 0.0;
 
-            if (!isFootContactLF && !isFootContactRF || !isFootContactLB && !isFootContactRB)
-                terminalReward = float(terminalRewardCoeff_)/10;
+            if (isFootContactLF || isFootContactRF)
+                ++terminalReward;
+
+            if (isFootContactLB || isFootContactRB)
+                ++terminalReward;
 
             return false;
         }
@@ -211,18 +209,17 @@ namespace raisim {
         bool visualizable_ = false;
         raisim::ArticulatedSystem* anymal_;
         Eigen::VectorXd gc_init_, gv_init_, gc_, gv_, pTarget_, pTarget12_, vTarget_;
-        double terminalRewardCoeff_ = -150;
+        double terminalRewardCoeff_ = -200;
         Eigen::VectorXd actionMean_, actionStd_, obDouble_;
         float stepHeight_;
         float stepWidth_;
         float targetAngularY_;
-        float dx_ = 0.481;
-        float dy_ = 0.245;
-        size_t bodyId_;
-        size_t footIdLF_;
-        size_t footIdRF_;
-        size_t footIdLB_;
-        size_t footIdRB_;
+        float dx_ = 0.325;
+        float dy_ = 0.15;
+        size_t footIdLF_ = 9;
+        size_t footIdRF_ = 12;
+        size_t footIdLB_ = 15;
+        size_t footIdRB_ = 18;
 
         /// these variables are not in use. They are placed to show you how to create a random number sampler.
         std::normal_distribution<double> normDist_;

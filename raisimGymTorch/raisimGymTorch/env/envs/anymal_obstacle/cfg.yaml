@@ -3,8 +3,8 @@ record_video: yes
 
 environment:
   render: True
-# just testing commenting
-  num_envs: 96
+  # just testing commenting
+  num_envs: 100
   eval_every_n: 200
   num_threads: 10
   simulation_dt: 0.0025
@@ -15,29 +15,29 @@ environment:
     footDeviationY:
       coeff: -1.0
     frontFeetDX:
-      coeff: -2.0
+      coeff: -1.5
     frontFeetDZ:
-      coeff: -3.2
+      coeff: -0.8
     backFeetDX:
       coeff: -1.6
     backFeetDZ:
-      coeff: 0.9
+      coeff: 0.6
     xVelocity:
-      coeff: 9.5
+      coeff: 5.5
     xAngular:
-      coeff: -2.5
+      coeff: -5.5
     yVelocity:
-      coeff: -2.5
+      coeff: -10.5
     yAngular:
-      coeff: -7.0
+      coeff: -5.0
     zVelocity:
       coeff: 3.5
     zAngular:
-      coeff: -3.5
+      coeff: -10.5
     torque:
-      coeff: -e-6
+      coeff: -e-5
 
 
 architecture:
-  policy_net: [128, 128]
-  value_net: [128, 128]
+  policy_net: [256, 256]
+  value_net: [256, 256]
