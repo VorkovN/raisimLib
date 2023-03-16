@@ -9,35 +9,17 @@ environment:
   num_threads: 10
   simulation_dt: 0.0025
   control_dt: 0.01
-  max_time: 8.0
+  max_time: 4.0
   action_std: 0.3
   reward:
-    footDeviationY:
-      coeff: -1.0
-    frontFeetDX:
-      coeff: -1.5
-    frontFeetDZ:
-      coeff: -0.8
-    backFeetDX:
-      coeff: -1.6
-    backFeetDZ:
-      coeff: 0.6
     xVelocity:
-      coeff: 5.5
+      coeff: 20.5
     xAngular:
-      coeff: -5.5
+      coeff: -2.5
     yVelocity:
       coeff: -10.5
-    yAngular:
-      coeff: -5.0
-    zVelocity:
-      coeff: 3.5
     zAngular:
-      coeff: -10.5
+      coeff: -20.5
     torque:
-      coeff: -e-5
+      coeff: -0.00005
 
-
-architecture:
-  policy_net: [256, 256]
-  value_net: [256, 256]

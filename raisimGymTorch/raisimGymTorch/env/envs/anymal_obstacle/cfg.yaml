@@ -37,7 +37,3 @@ environment:
     torque:
       coeff: -e-5
 
-
-architecture:
-  policy_net: [256, 256]
-  value_net: [256, 256]

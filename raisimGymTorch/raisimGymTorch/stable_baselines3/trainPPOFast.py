@@ -12,7 +12,8 @@ from stable_baselines3 import HER
 from stable_baselines3 import PPO
 from stable_baselines3 import SAC
 from stable_baselines3 import TD3
-
+from raisimGymTorch.env.bin import anymal_climbing as rsg_anymal
+# from stable_baselines3.common.policies import ActorCriticPolicy
 from raisimGymTorch.stable_baselines3.RaisimSbGymVecEnv import RaisimSbGymVecEnv as VecEnv
 from stable_baselines3.common.callbacks import BaseCallback
 
@@ -32,92 +33,69 @@ logsPath = baselineDataPath
 
 cfg = YAML().load(open(taskPath + "/cfg.yaml", 'r'))
 n_steps = int(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
-batch_size = int(n_steps*cfg['environment']['num_envs']/8)
+batch_size = int(n_steps*cfg['environment']['num_envs']/4)
 
-
-if args.algorithm == 'A2C':
-    from stable_baselines3.a2c.policies import MlpPolicy
-elif args.algorithm == 'DDPG':
-    from stable_baselines3.ddpg.policies import MlpPolicy
-elif args.algorithm == 'DQN':
-    from stable_baselines3.dqn.policies import MlpPolicy
-# elif args.algorithm == 'HER':
-#     from stable_baselines3.her.policies import MlpPolicy
-elif args.algorithm == 'PPO':
-    from stable_baselines3.ppo.policies import MlpPolicy
-elif args.algorithm == 'SAC':
-    from stable_baselines3.sac.policies import MlpPolicy, SACPolicy, MultiInputPolicy
-elif args.algorithm == 'TD3':
-    from stable_baselines3.td3.policies import MlpPolicy
-else:
-    print("Wrong algorithm:")
-    exit(0)
-
-if args.environment_type == 'climbing':
-    from raisimGymTorch.env.bin import anymal_climbing as rsg_anymal
-elif args.environment_type == 'obstacle':
-    from raisimGymTorch.env.bin import anymal_obstacle as rsg_anymal
-elif args.environment_type == 'run':
-    from raisimGymTorch.env.bin import anymal_run as rsg_anymal
-elif args.environment_type == 'turn':
-    from raisimGymTorch.env.bin import anymal_turn as rsg_anymal
+# if args.environment_type == 'climbing':
+#     from raisimGymTorch.env.bin import anymal_climbing as rsg_anymal
+# elif args.environment_type == 'obstacle':
+#     from raisimGymTorch.env.bin import anymal_obstacle as rsg_anymal
+# elif args.environment_type == 'run':
+#     from raisimGymTorch.env.bin import anymal_run as rsg_anymal
+# elif args.environment_type == 'turn':
+#     from raisimGymTorch.env.bin import anymal_turn as rsg_anymal
 
 env = VecEnv(rsg_anymal.RaisimGymEnv(rscPath, dump(cfg['environment'], Dumper=RoundTripDumper)))
 env.reset()
-class CustomPolicy(MlpPolicy):
-    def __init__(self, *args, **kwargs):
-        super(CustomPolicy, self).__init__(*args, **kwargs, net_arch=dict(pi=[128, 128], vf=[128, 128]))
-
-class CustomSACPolicy(MlpPolicy):
-    def __init__(self, *args, **kwargs):
-        super(CustomSACPolicy, self).__init__(*args, **kwargs, net_arch=[128, 128])
+# class CustomPolicy(ActorCriticPolicy):
+#     def __init__(self, *args, **kwargs):
+#         super(CustomPolicy, self).__init__(*args, **kwargs, net_arch=dict(pi=[128, 128], vf=[128, 128]))
 
 if args.algorithm == 'A2C':
     if not args.model_path:
         print("A2C new algorithm:")
-        model = A2C(CustomPolicy, env, n_steps=n_steps, verbose=0, tensorboard_log=logsPath, gamma=0.98)
+        model = A2C("MlpPolicy", env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.97)
     else:
         print("A2C old algorithm:")
         model = A2C.load(args.model_path, env)
 elif args.algorithm == 'DDPG':
     if not args.model_path:
         print("DDPG new algorithm:")
-        model = DDPG(CustomPolicy, env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.97)
+        model = DDPG("MlpPolicy", env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.97)
     else:
         print("DDPG old algorithm:")
         model = DDPG.load(args.model_path, env)
 elif args.algorithm == 'DQN':
     if not args.model_path:
         print("DQN new algorithm:")
-        model = DQN(CustomPolicy, env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.97)
+        model = DQN("MlpPolicy", env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.97)
     else:
         print("DQN old algorithm:")
         model = DQN.load(args.model_path, env)
 elif args.algorithm == 'HER':
     if not args.model_path:
         print("HER new algorithm:")
-        model = HER(CustomPolicy, env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.97)
+        model = HER("MlpPolicy", env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.97)
     else:
         print("HER old algorithm:")
         model = HER.load(args.model_path, env)
 elif args.algorithm == 'PPO':
     if not args.model_path:
         print("PPO new algorithm:")
-        model = PPO(CustomPolicy, env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.99, clip_range=0.5, clip_range_vf=0.5)
+        model = PPO("MlpPolicy", env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.98, clip_range=0.5, clip_range_vf=0.5)
     else:
         print("PPO old algorithm:")
         model = PPO.load(args.model_path, env)
 elif args.algorithm == 'SAC':
     if not args.model_path:
         print("SAC new algorithm:")
-        model = SAC(CustomSACPolicy, env, verbose=0, ent_coef=2, batch_size=int(batch_size/4), tensorboard_log=logsPath, gamma=0.99)
+        model = SAC("MlpPolicy", env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.97)
     else:
         print("SAC old algorithm:")
         model = SAC.load(args.model_path, env)
 elif args.algorithm == 'TD3':
     if not args.model_path:
         print("TD3 new algorithm:")
-        model = TD3(MlpPolicy, env, verbose=0, batch_size=int(batch_size/4), tensorboard_log=logsPath, gamma=0.98)
+        model = TD3("MlpPolicy", env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.97)
     else:
         print("TD3 old algorithm:")
         model = TD3.load(args.model_path, env)
@@ -137,14 +115,9 @@ class TensorboardCallback(BaseCallback):
         self.logger.record('Coords/z', z)
         return True
 
-    def _on_rollout_end(self) -> None:
-        env.reset()
-        pass
-
 
 for iteration in range(1000):
     print("iteration: ", iteration, flush=True)
-    print(model.get_parameters())
     model.learn(total_timesteps=200000000, progress_bar=True, callback=TensorboardCallback())
     model.save(modelsPath + modelName + str(iteration))
 

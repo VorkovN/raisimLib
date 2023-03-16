@@ -15,32 +15,17 @@ namespace raisim {
 
     public:
 
-        explicit ENVIRONMENT(const std::string& resourceDir, const Yaml::Node& cfg, bool visualizable) :
-                RaisimGymEnv(resourceDir, cfg), visualizable_(visualizable), normDist_(0, 1) {
+        explicit ENVIRONMENT(const std::string& resourceDir, const Yaml::Node& cfg, bool visualizable, int seed = 0) :
+                RaisimGymEnv(resourceDir, cfg), visualizable_(visualizable), normDist_(0, 1), seed_(seed) {
 
             /// create world
             world_ = std::make_unique<raisim::World>();
 
             /// add objects
-            anymal_ = world_->addArticulatedSystem(resourceDir_+"/anymal/urdf/anymal.urdf");
+            anymal_ = world_->addArticulatedSystem(resourceDir_+"/aliengo/aliengo.urdf");
             anymal_->setName("anymal");
             anymal_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
             world_->addGround();
-
-            stepHeight_ = float(std::rand()%13)/100+0.12;
-            stepWidth_ = float(std::rand()%5)/100+0.25;
-            uint8_t stepCount = 10;
-            float mass = 1;
-            float stairY = 0;
-            float stairWidth = 1.5;
-            float stairX = dx_+2*stepWidth_/3;
-            for (int stepNumber=0; stepNumber < stepCount; ++stepNumber)
-            {
-                auto box = world_->addBox(stepWidth_, stairWidth, stepHeight_, mass);
-                box->setPosition(raisim::Vec<3>{stairX+stepNumber*stepWidth_, stairY, stepHeight_*(stepNumber+0.5)});
-                box->setBodyType(raisim::BodyType::STATIC);
-            }
-            targetAngularY_ = -2*atan(stepHeight_/stepWidth_)/3.14*1.2;
 
             /// get robot data
             gcDim_ = anymal_->getGeneralizedCoordinateDim();
@@ -52,19 +37,22 @@ namespace raisim {
             gv_.setZero(gvDim_); gv_init_.setZero(gvDim_);
             pTarget_.setZero(gcDim_); vTarget_.setZero(gvDim_); pTarget12_.setZero(nJoints_);
 
-            /// this is nominal configuration of anymal
-            gc_init_ << 0, 0, 0.42, 1.0, 0.0, 0.0, 0.0, 0.0, 1.1, -1.3, 0.0, 1.1, -1.3, 0.0, 1.1, -2.0, 0.0, 1.1, -2.0;
+            srand (time(NULL));
+            stepHeight_ = float(std::rand()%8)/100+0.12;
+            stepWidth_ = float(std::rand()%5)/100+0.25;
+
+            gc_init_ << 0.0, 0.0, 0.38, 1.0, 0.0, 0.0, 0.0, 0.0, 0.9, -1.5, 0.0, 0.9, -1.5, 0.0, 0.9, -1.5, 0.0, 0.9, -1.5; //обычная стойка
 
             /// set pd gains
             Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
-            jointPgain.setZero(); jointPgain.tail(nJoints_).setConstant(50.0);
-            jointDgain.setZero(); jointDgain.tail(nJoints_).setConstant(0.2);
+            jointPgain.setZero(); jointPgain.tail(nJoints_).setConstant(55.0);
+            jointDgain.setZero(); jointDgain.tail(nJoints_).setConstant(2.0);
             anymal_->setPdGains(jointPgain, jointDgain);
             anymal_->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
 
             /// MUST BE DONE FOR ALL ENVIRONMENTS
-//            obDim_ = 38;
-            obDim_ = 20;
+            obDim_ = 38;
+//            obDim_ = 20;
             actionDim_ = nJoints_; actionMean_.setZero(actionDim_); actionStd_.setZero(actionDim_);
             obDouble_.setZero(obDim_);
 
@@ -77,12 +65,6 @@ namespace raisim {
             /// Reward coefficients
             rewards_.initializeFromConfigurationFile (cfg["reward"]);
 
-            /// indices of links that should not make contact with ground
-            bodyId_ = 0;
-            footIdLF_ = 9;
-            footIdRF_ = 13;
-            footIdLB_ = 17;
-            footIdRB_ = 21;
             /// visualize if it is the first environment
             if (visualizable_) {
                 server_ = std::make_unique<raisim::RaisimServer>(world_.get());
@@ -104,7 +86,6 @@ namespace raisim {
             pTarget12_ = pTarget12_.cwiseProduct(actionStd_); // тут мы хотим чтобы действие совершалось не до конца
             pTarget12_ += actionMean_;
             pTarget_.tail(nJoints_) = pTarget12_;
-
             anymal_->setPdTarget(pTarget_, vTarget_);
 
             for(int i=0; i< int(control_dt_ / simulation_dt_ + 1e-10); i++){
@@ -115,41 +96,35 @@ namespace raisim {
 
             updateObservation();
 
-            raisim::Vec<3> footPositionLF;
-            anymal_->getFramePosition(footIdLF_, footPositionLF);
-            raisim::Vec<3> footPositionRF;
-            anymal_->getFramePosition(footIdRF_, footPositionRF);
-            raisim::Vec<3> footPositionLB;
-            anymal_->getFramePosition(footIdLB_, footPositionLB);
-            raisim::Vec<3> footPositionRB;
-            anymal_->getFramePosition(footIdRB_, footPositionRB);
-
-            float footDeviationY = (gc_[1]+dy_-footPositionLF[1])*(gc_[1]+dy_-footPositionLF[1])+(gc_[1]-dy_-footPositionRF[1])*(gc_[1]-dy_-footPositionRF[1])+(gc_[1]+dy_-footPositionLB[1])*(gc_[1]+dy_-footPositionLB[1])+(gc_[1]-dy_-footPositionRB[1])*(gc_[1]-dy_-footPositionRB[1]);
-            float frontFeetDX = (gc_[0]+1.5*dx_-footPositionLF[0])*(gc_[0]+1.5*dx_-footPositionLF[0]) + (gc_[0]+1.5*dx_-footPositionRF[0])*(gc_[0]+1.5*dx_-footPositionRF[0]);
-            float frontFeetDZ = (gc_[2]-footPositionLF[2])*(gc_[2]-footPositionLF[2]) + (gc_[2]-footPositionRF[2])*(gc_[2]-footPositionRF[2]);  
-            float backFeetDX = (gc_[0]-dx_-footPositionLB[0])*(gc_[0]-dx_-footPositionLB[0]) + (gc_[0]-dx_-footPositionRB[0])*(gc_[0]-dx_-footPositionRB[0]);
-            float backFeetDZ = (gc_[2]-footPositionLB[2])*(gc_[2]-footPositionLB[2]) + (gc_[2]-footPositionRB[2])*(gc_[2]-footPositionRB[2]);
-
-            rewards_.record("footDeviationY", footDeviationY);
-            rewards_.record("frontFeetDX", frontFeetDX);
-            rewards_.record("frontFeetDZ", frontFeetDZ);
-            rewards_.record("backFeetDX", backFeetDX);
-            rewards_.record("backFeetDZ", backFeetDZ);
-            rewards_.record("torque", anymal_->getGeneralizedForce().squaredNorm());
-            rewards_.record("xVelocity", std::min(0.25, gv_[0]));
-	        rewards_.record("xAngular", gv_[3]*gv_[3]);
-	        rewards_.record("yVelocity", gv_[1]*gv_[1]);
-            rewards_.record("yAngular", (gc_[5]/gc_[3]-targetAngularY_)*(gc_[5]/gc_[3]-targetAngularY_));
-            rewards_.record("zVelocity", gv_[2]);
-            rewards_.record("zAngular", gv_[5]*gv_[5]);
+            float torque = anymal_->getGeneralizedForce().squaredNorm();
+            rewards_.record("torque", torque);
+            float xVelocity = gv_[0];
+            rewards_.record("xVelocity", xVelocity);
+            float xAngular = gv_[3]*gv_[3];
+            rewards_.record("xAngular", xAngular);
+            float yVelocity = gv_[1]*gv_[1];
+            rewards_.record("yVelocity", yVelocity);
+            float zAngular = gv_[5]*gv_[5];
+            rewards_.record("zAngular", zAngular);
+            static int counter = 0;
+            if (counter++ % 98765 == 1)
+            {
+                std::cout << "CURRENT REWARDS:\n";
+                std::cout << "torque: " << rewards_["torque"] << "\n";
+                std::cout << "xVelocity: " << rewards_["xVelocity"] << "\n";
+                std::cout << "xAngular: " << rewards_["xAngular"] << "\n";
+                std::cout << "yVelocity: " << rewards_["yVelocity"] << "\n";
+                std::cout << "zAngular: " << rewards_["zAngular"] << "\n";
+                std::cout.flush();
+            }
 
             return rewards_.sum();
         }
 
         void updateObservation() {
             anymal_->getState(gc_, gv_);
-//            obDouble_ << stepHeight_, stepWidth_, gv_, gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
-            obDouble_ << stepHeight_, stepWidth_, gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
+            obDouble_ << stepHeight_, stepWidth_, gv_, gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
+//            obDouble_ << stepHeight_, stepWidth_, gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
 
         }
 
@@ -171,10 +146,6 @@ namespace raisim {
         }
 
         bool isTerminalState(float& terminalReward) final {
-            terminalReward = float(terminalRewardCoeff_);
-
-            if (anymal_->getContacts().empty())
-                return true;
 
             bool isFootContactLF = false;
             bool isFootContactRF = false;
@@ -183,28 +154,23 @@ namespace raisim {
 
             for(auto& contact: anymal_->getContacts())
             {
-                if (contact.getlocalBodyIndex() == bodyId_)
-                    return true;
 
-                if (contact.getlocalBodyIndex() == footIdLF_)
+                if (contact.getlocalBodyIndex() == footIdLF_ - 6) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
                     isFootContactLF = true;
-                if (contact.getlocalBodyIndex() == footIdRF_)
+                if (contact.getlocalBodyIndex() == footIdRF_ - 6) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
                     isFootContactRF = true;
-                if (contact.getlocalBodyIndex() == footIdLB_)
+                if (contact.getlocalBodyIndex() == footIdLB_ - 6) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
                     isFootContactLB = true;
-                if (contact.getlocalBodyIndex() == footIdRB_)
+                if (contact.getlocalBodyIndex() == footIdRB_ - 6) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
                     isFootContactRB = true;
             }
 
             terminalReward = 0.0;
+            if (isFootContactLF || isFootContactRF || isFootContactLB || isFootContactRB)
+                return false;
 
-            if (isFootContactLF || isFootContactRF)
-                ++terminalReward;
-
-            if (isFootContactLB || isFootContactRB)
-                ++terminalReward;
-
-            return false;
+            terminalReward = float(terminalRewardCoeff_);
+            return true;
         }
 
         void curriculumUpdate() { };
@@ -214,18 +180,15 @@ namespace raisim {
         bool visualizable_ = false;
         raisim::ArticulatedSystem* anymal_;
         Eigen::VectorXd gc_init_, gv_init_, gc_, gv_, pTarget_, pTarget12_, vTarget_;
-        double terminalRewardCoeff_ = -200;
+        double terminalRewardCoeff_ = -100;
         Eigen::VectorXd actionMean_, actionStd_, obDouble_;
         float stepHeight_;
         float stepWidth_;
-        float targetAngularY_;
-        float dx_ = 0.481;
-        float dy_ = 0.245;
-        size_t bodyId_;
-        size_t footIdLF_;
-        size_t footIdRF_;
-        size_t footIdLB_;
-        size_t footIdRB_;
+        size_t footIdLF_ = 9;
+        size_t footIdRF_ = 12;
+        size_t footIdLB_ = 15;
+        size_t footIdRB_ = 18;
+        int seed_;
 
         /// these variables are not in use. They are placed to show you how to create a random number sampler.
         std::normal_distribution<double> normDist_;

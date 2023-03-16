@@ -13,31 +13,32 @@ environment:
   action_std: 0.3
   reward:
     footDeviationY:
-      coeff: -1.0
+      coeff: -3.0
     frontFeetDX:
       coeff: -10.5
     frontFeetDZ:
-      coeff: -7.8
+      coeff: -9.8
     backFeetDX:
-      coeff: -1.6
+      coeff: -4.6
     backFeetDZ:
       coeff: 0.6
     xVelocity:
-      coeff: 8.5
+      coeff: 9.5
     xAngular:
       coeff: -5.5
     yVelocity:
       coeff: -10.5
     yAngular:
-      coeff: -5.0
+      coeff: -40.0
     zVelocity:
-      coeff: 8.5
+      coeff: 6.5
     zAngular:
-      coeff: -50.5
+      coeff: -40.5
     torque:
-      coeff: -e-6
+      coeff: -0.00005
+    xCoord:
+      coeff: 0.000003
+    zCoord:
+      coeff: 0.000003
 
 
-architecture:
-  policy_net: [256, 256]
-  value_net: [256, 256]
