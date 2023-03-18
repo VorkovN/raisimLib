@@ -32,7 +32,7 @@ logsPath = baselineDataPath
 
 cfg = YAML().load(open(taskPath + "/cfg.yaml", 'r'))
 n_steps = int(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
-batch_size = int(n_steps*cfg['environment']['num_envs']/8)
+batch_size = int(n_steps*cfg['environment']['num_envs']/4)
 
 
 if args.algorithm == 'A2C':
@@ -103,21 +103,21 @@ elif args.algorithm == 'HER':
 elif args.algorithm == 'PPO':
     if not args.model_path:
         print("PPO new algorithm:")
-        model = PPO(CustomPolicy, env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.99, clip_range=0.5, clip_range_vf=0.5)
+        model = PPO(CustomPolicy, env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.99, clip_range=0.3, clip_range_vf=0.3)
     else:
         print("PPO old algorithm:")
         model = PPO.load(args.model_path, env)
 elif args.algorithm == 'SAC':
     if not args.model_path:
         print("SAC new algorithm:")
-        model = SAC(CustomSACPolicy, env, verbose=0, ent_coef=2, batch_size=int(batch_size/4), tensorboard_log=logsPath, gamma=0.99)
+        model = SAC(CustomSACPolicy, env, verbose=0, train_freq=n_steps, ent_coef=2, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.99)
     else:
         print("SAC old algorithm:")
         model = SAC.load(args.model_path, env)
 elif args.algorithm == 'TD3':
     if not args.model_path:
         print("TD3 new algorithm:")
-        model = TD3(MlpPolicy, env, verbose=0, batch_size=int(batch_size/4), tensorboard_log=logsPath, gamma=0.98)
+        model = TD3(MlpPolicy, env, verbose=0, train_freq=n_steps, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.98)
     else:
         print("TD3 old algorithm:")
         model = TD3.load(args.model_path, env)
@@ -145,7 +145,7 @@ class TensorboardCallback(BaseCallback):
 for iteration in range(1000):
     print("iteration: ", iteration, flush=True)
     print(model.get_parameters())
-    model.learn(total_timesteps=200000000, progress_bar=True, callback=TensorboardCallback())
+    model.learn(total_timesteps=100000000, progress_bar=True, callback=TensorboardCallback())
     model.save(modelsPath + modelName + str(iteration))
 
 

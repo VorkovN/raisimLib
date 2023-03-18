@@ -45,8 +45,8 @@ namespace raisim {
 
             /// set pd gains
             Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
-            jointPgain.setZero(); jointPgain.tail(nJoints_).setConstant(55.0);
-            jointDgain.setZero(); jointDgain.tail(nJoints_).setConstant(2.0);
+            jointPgain.setZero(); jointPgain.tail(nJoints_).setConstant(50.0);
+            jointDgain.setZero(); jointDgain.tail(nJoints_).setConstant(10.0);
             anymal_->setPdGains(jointPgain, jointDgain);
             anymal_->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
 
@@ -98,12 +98,14 @@ namespace raisim {
 
             float torque = anymal_->getGeneralizedForce().squaredNorm();
             rewards_.record("torque", torque);
-            float xVelocity = gv_[0];
+            float xVelocity = std::min(1.0, gv_[0]);
             rewards_.record("xVelocity", xVelocity);
             float xAngular = gv_[3]*gv_[3];
             rewards_.record("xAngular", xAngular);
             float yVelocity = gv_[1]*gv_[1];
             rewards_.record("yVelocity", yVelocity);
+            float yAngular = gc_[5]*gc_[5];
+            rewards_.record("yAngular", yAngular);
             float zAngular = gv_[5]*gv_[5];
             rewards_.record("zAngular", zAngular);
             static int counter = 0;
@@ -114,7 +116,13 @@ namespace raisim {
                 std::cout << "xVelocity: " << rewards_["xVelocity"] << "\n";
                 std::cout << "xAngular: " << rewards_["xAngular"] << "\n";
                 std::cout << "yVelocity: " << rewards_["yVelocity"] << "\n";
+                std::cout << "yAngular: " << rewards_["yAngular"] << "\n";
                 std::cout << "zAngular: " << rewards_["zAngular"] << "\n";
+
+                std::cout << "ACTIONS:\n";
+                std::cout << action[0] << " " << action[1] << " " << action[2] << " " << action[3] << " "
+                          << action[4] << " " << action[5] << " " << action[6] << " " << action[7] << " "
+                          << action[8] << " " << action[9] << " " << action[10] << " " << action[11] << "\n";
                 std::cout.flush();
             }
 
@@ -180,7 +188,7 @@ namespace raisim {
         bool visualizable_ = false;
         raisim::ArticulatedSystem* anymal_;
         Eigen::VectorXd gc_init_, gv_init_, gc_, gv_, pTarget_, pTarget12_, vTarget_;
-        double terminalRewardCoeff_ = -100;
+        double terminalRewardCoeff_ = -200;
         Eigen::VectorXd actionMean_, actionStd_, obDouble_;
         float stepHeight_;
         float stepWidth_;
