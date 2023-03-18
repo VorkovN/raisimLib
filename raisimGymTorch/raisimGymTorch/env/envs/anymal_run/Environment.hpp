@@ -33,26 +33,34 @@ namespace raisim {
             nJoints_ = gvDim_ - 6;
 
             /// initialize containers
-            gc_.setZero(gcDim_); gc_init_.setZero(gcDim_);
-            gv_.setZero(gvDim_); gv_init_.setZero(gvDim_);
-            pTarget_.setZero(gcDim_); vTarget_.setZero(gvDim_); pTarget12_.setZero(nJoints_);
+            gc_.setZero(gcDim_);
+            gc_init_.setZero(gcDim_);
+            gv_.setZero(gvDim_);
+            gv_init_.setZero(gvDim_);
+            pTarget_.setZero(gcDim_);
+            vTarget_.setZero(gvDim_);
+//            vTarget_.tail(nJoints_).setConstant(0.002);
+            pTarget12_.setZero(nJoints_);
 
             srand (time(NULL));
             stepHeight_ = float(std::rand()%8)/100+0.12;
             stepWidth_ = float(std::rand()%5)/100+0.25;
 
-            gc_init_ << 0.0, 0.0, 0.38, 1.0, 0.0, 0.0, 0.0, 0.0, 0.9, -1.5, 0.0, 0.9, -1.5, 0.0, 0.9, -1.5, 0.0, 0.9, -1.5; //обычная стойка
+            gc_init_ << 0.0, 0.0, 0.39, 1.0, 0.0, 0.0, 0.0, 0.0, 0.78, -1.5, 0.0, 0.8, -1.5, 0.0, 0.78, -1.5, 0.0, 0.8, -1.5; //обычная стойка
 
             /// set pd gains
             Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
-            jointPgain.setZero(); jointPgain.tail(nJoints_).setConstant(50.0);
-            jointDgain.setZero(); jointDgain.tail(nJoints_).setConstant(10.0);
+            jointPgain.setZero();
+            jointPgain.tail(nJoints_).setConstant(50.0);
+            jointDgain.setZero();
+            jointDgain.tail(nJoints_).setConstant(20.0);
+//            jointDgain.tail(nJoints_/2).setConstant(1.0);
             anymal_->setPdGains(jointPgain, jointDgain);
             anymal_->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
 
             /// MUST BE DONE FOR ALL ENVIRONMENTS
-            obDim_ = 38;
-//            obDim_ = 20;
+//            obDim_ = 38;
+            obDim_ = 26;
             actionDim_ = nJoints_; actionMean_.setZero(actionDim_); actionStd_.setZero(actionDim_);
             obDouble_.setZero(obDim_);
 
@@ -75,6 +83,10 @@ namespace raisim {
 
         void init() final { }
 
+        float normalizeReward(float x, float coeff) {
+            return (1./coeff-x*x);
+        }
+
         void reset() final {
             anymal_->setState(gc_init_, gv_init_);
             updateObservation();
@@ -83,7 +95,7 @@ namespace raisim {
         float step(const Eigen::Ref<EigenVec>& action) final {
             /// action scaling
             pTarget12_ = action.cast<double>();
-            pTarget12_ = pTarget12_.cwiseProduct(actionStd_); // тут мы хотим чтобы действие совершалось не до конца
+//            pTarget12_ = pTarget12_.cwiseProduct(actionStd_); // тут мы хотим чтобы действие совершалось не до конца
             pTarget12_ += actionMean_;
             pTarget_.tail(nJoints_) = pTarget12_;
             anymal_->setPdTarget(pTarget_, vTarget_);
@@ -96,33 +108,72 @@ namespace raisim {
 
             updateObservation();
 
+            raisim::Vec<3> footPositionLF;
+            anymal_->getFramePosition(footIdLF_, footPositionLF);
+            raisim::Vec<3> footPositionRF;
+            anymal_->getFramePosition(footIdRF_, footPositionRF);
+            raisim::Vec<3> footPositionLB;
+            anymal_->getFramePosition(footIdLB_, footPositionLB);
+            raisim::Vec<3> footPositionRB;
+            anymal_->getFramePosition(footIdRB_, footPositionRB);
+
+            float footDeviationY = normalizeReward((gc_[7]), rewards_.rewards_["footDeviationY"].coefficient)/4
+                                 + normalizeReward((gc_[10]), rewards_.rewards_["footDeviationY"].coefficient)/4
+                                 + normalizeReward((gc_[13]), rewards_.rewards_["footDeviationY"].coefficient)/4
+                                 + normalizeReward((gc_[16]), rewards_.rewards_["footDeviationY"].coefficient)/4;
+            rewards_.record("footDeviationY", footDeviationY);
+
+            float feetDZ = std::min(0.1f, normalizeReward(footPositionLF[2], rewards_.rewards_["feetDZ"].coefficient)/4)
+                         + std::min(0.1f, normalizeReward(footPositionRF[2], rewards_.rewards_["feetDZ"].coefficient)/4)
+                         + std::min(0.1f, normalizeReward(footPositionLB[2], rewards_.rewards_["feetDZ"].coefficient)/4)
+                         + std::min(0.1f, normalizeReward(footPositionRB[2], rewards_.rewards_["feetDZ"].coefficient)/4);
+            rewards_.record("feetDZ", feetDZ);
+
             float torque = anymal_->getGeneralizedForce().squaredNorm();
             rewards_.record("torque", torque);
-            float xVelocity = std::min(1.0, gv_[0]);
+
+            float xVelocity = std::min(5.0, gv_[0]);
             rewards_.record("xVelocity", xVelocity);
-            float xAngular = gv_[3]*gv_[3];
+
+            float xAngular = normalizeReward(gc_[4], rewards_.rewards_["xAngular"].coefficient);
             rewards_.record("xAngular", xAngular);
-            float yVelocity = gv_[1]*gv_[1];
+
+            float yVelocity = normalizeReward(gv_[1], rewards_.rewards_["yVelocity"].coefficient);
             rewards_.record("yVelocity", yVelocity);
-            float yAngular = gc_[5]*gc_[5];
+
+            float yAngular = normalizeReward(gc_[5], rewards_.rewards_["yAngular"].coefficient);
             rewards_.record("yAngular", yAngular);
-            float zAngular = gv_[5]*gv_[5];
+
+            float zCoord = normalizeReward(gc_init_[2]-gc_[2], rewards_.rewards_["zCoord"].coefficient);
+            rewards_.record("zCoord", zCoord);
+
+            float zAngular = normalizeReward(gv_[5], rewards_.rewards_["zAngular"].coefficient);
             rewards_.record("zAngular", zAngular);
+
             static int counter = 0;
             if (counter++ % 98765 == 1)
             {
                 std::cout << "CURRENT REWARDS:\n";
+                std::cout << "footDeviationY: " << rewards_["footDeviationY"] << "\n";
+                std::cout << "feetDZ: " << rewards_["feetDZ"] << "\n";
                 std::cout << "torque: " << rewards_["torque"] << "\n";
                 std::cout << "xVelocity: " << rewards_["xVelocity"] << "\n";
                 std::cout << "xAngular: " << rewards_["xAngular"] << "\n";
                 std::cout << "yVelocity: " << rewards_["yVelocity"] << "\n";
                 std::cout << "yAngular: " << rewards_["yAngular"] << "\n";
+                std::cout << "zCoord: " << rewards_["zCoord"] << "\n";
                 std::cout << "zAngular: " << rewards_["zAngular"] << "\n";
 
                 std::cout << "ACTIONS:\n";
                 std::cout << action[0] << " " << action[1] << " " << action[2] << " " << action[3] << " "
                           << action[4] << " " << action[5] << " " << action[6] << " " << action[7] << " "
                           << action[8] << " " << action[9] << " " << action[10] << " " << action[11] << "\n";
+                std::cout << "FOOT POSITION:\n";
+                std::cout << footPositionLF[0] << " " << footPositionRF[0] << " " << footPositionLB[0] << " " << footPositionRB[0] << "\n";
+                std::cout << footPositionLF[1] << " " << footPositionRF[1] << " " << footPositionLB[1] << " " << footPositionRB[1] << "\n";
+                std::cout << footPositionLF[2] << " " << footPositionRF[2] << " " << footPositionLB[2] << " " << footPositionRB[2] << "\n";
+                std::cout << gc_[1]-dy_-footPositionLF[1] << " " << gc_[1]+dy_-footPositionRF[1] << " " << gc_[1]-dy_-footPositionLB[1] << " " << gc_[1]+dy_-footPositionRB[1] << "\n";
+
                 std::cout.flush();
             }
 
@@ -131,9 +182,9 @@ namespace raisim {
 
         void updateObservation() {
             anymal_->getState(gc_, gv_);
-            obDouble_ << stepHeight_, stepWidth_, gv_, gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
+            obDouble_ << stepHeight_, stepWidth_, gv_.head(6), gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
 //            obDouble_ << stepHeight_, stepWidth_, gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
-
+            actionMean_ = gc_;
         }
 
         float getX()
@@ -192,6 +243,8 @@ namespace raisim {
         Eigen::VectorXd actionMean_, actionStd_, obDouble_;
         float stepHeight_;
         float stepWidth_;
+        float dx_ = 0.325;
+        float dy_ = 0.14;
         size_t footIdLF_ = 9;
         size_t footIdRF_ = 12;
         size_t footIdLB_ = 15;

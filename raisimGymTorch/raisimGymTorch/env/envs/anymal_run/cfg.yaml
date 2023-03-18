@@ -10,18 +10,24 @@ environment:
   simulation_dt: 0.0025
   control_dt: 0.01
   max_time: 8.0
-  action_std: 0.3
+  action_std: 0.5
   reward:
+    footDeviationY:
+      coeff: 120.0
+    feetDZ:
+      coeff: 40.0
     xVelocity:
-      coeff: 15.5
+      coeff: 10.5
     xAngular:
-      coeff: -1.5
+      coeff: 15.5
     yVelocity:
-      coeff: -5.5
+      coeff: 25.5
     yAngular:
-      coeff: -30.0
+      coeff: 122.0
+    zCoord:
+      coeff: 228.0
     zAngular:
-      coeff: -10.5
+      coeff: 20.5
     torque:
-      coeff: -0.00005
+      coeff: -0.00001
 

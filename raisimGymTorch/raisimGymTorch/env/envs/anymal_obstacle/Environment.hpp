@@ -108,6 +108,10 @@ namespace raisim {
 
         void init() final { }
 
+        float normalizeReward(float x, float coeff) {
+            return (1./coeff-x*x);
+        }
+
         void reset() final {
             anymal_->setState(gc_init_, gv_init_);
             updateObservation();

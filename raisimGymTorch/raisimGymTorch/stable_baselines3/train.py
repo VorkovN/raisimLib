@@ -5,13 +5,12 @@ import argparse
 from ruamel.yaml import YAML, dump, RoundTripDumper
 
 #ЕСЛИ ИМПОРТ ПЕРЕНЕСТИ НА СТРОЧКУ НИЖЕ ПРОИЗВОДИТЕЛЬНОСТЬ УПАДЕТ В 10 РАЗ!!!
-from stable_baselines3 import A2C
-from stable_baselines3 import DDPG
-from stable_baselines3 import DQN
-from stable_baselines3 import HER
+
 from stable_baselines3 import PPO
+from sb3_contrib import TRPO
 from stable_baselines3 import SAC
 from stable_baselines3 import TD3
+from stable_baselines3 import DQN
 
 from raisimGymTorch.stable_baselines3.RaisimSbGymVecEnv import RaisimSbGymVecEnv as VecEnv
 from stable_baselines3.common.callbacks import BaseCallback
@@ -35,20 +34,16 @@ n_steps = int(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 batch_size = int(n_steps*cfg['environment']['num_envs']/4)
 
 
-if args.algorithm == 'A2C':
-    from stable_baselines3.a2c.policies import MlpPolicy
-elif args.algorithm == 'DDPG':
-    from stable_baselines3.ddpg.policies import MlpPolicy
-elif args.algorithm == 'DQN':
-    from stable_baselines3.dqn.policies import MlpPolicy
-# elif args.algorithm == 'HER':
-#     from stable_baselines3.her.policies import MlpPolicy
-elif args.algorithm == 'PPO':
+if args.algorithm == 'PPO':
+    from stable_baselines3.ppo.policies import MlpPolicy
+elif args.algorithm == 'TRPO':
     from stable_baselines3.ppo.policies import MlpPolicy
 elif args.algorithm == 'SAC':
     from stable_baselines3.sac.policies import MlpPolicy, SACPolicy, MultiInputPolicy
 elif args.algorithm == 'TD3':
     from stable_baselines3.td3.policies import MlpPolicy
+elif args.algorithm == 'DQN':
+    from stable_baselines3.dqn.policies import MlpPolicy
 else:
     print("Wrong algorithm:")
     exit(0)
@@ -70,57 +65,43 @@ class CustomPolicy(MlpPolicy):
 
 class CustomSACPolicy(MlpPolicy):
     def __init__(self, *args, **kwargs):
-        super(CustomSACPolicy, self).__init__(*args, **kwargs, net_arch=[128, 128])
+        super(CustomSACPolicy, self).__init__(*args, **kwargs, net_arch=[256, 256])
 
-if args.algorithm == 'A2C':
-    if not args.model_path:
-        print("A2C new algorithm:")
-        model = A2C(CustomPolicy, env, n_steps=n_steps, verbose=0, tensorboard_log=logsPath, gamma=0.98)
-    else:
-        print("A2C old algorithm:")
-        model = A2C.load(args.model_path, env)
-elif args.algorithm == 'DDPG':
-    if not args.model_path:
-        print("DDPG new algorithm:")
-        model = DDPG(CustomPolicy, env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.97)
-    else:
-        print("DDPG old algorithm:")
-        model = DDPG.load(args.model_path, env)
-elif args.algorithm == 'DQN':
-    if not args.model_path:
-        print("DQN new algorithm:")
-        model = DQN(CustomPolicy, env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.97)
-    else:
-        print("DQN old algorithm:")
-        model = DQN.load(args.model_path, env)
-elif args.algorithm == 'HER':
-    if not args.model_path:
-        print("HER new algorithm:")
-        model = HER(CustomPolicy, env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.97)
-    else:
-        print("HER old algorithm:")
-        model = HER.load(args.model_path, env)
-elif args.algorithm == 'PPO':
+if args.algorithm == 'PPO':
     if not args.model_path:
         print("PPO new algorithm:")
-        model = PPO(CustomPolicy, env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.99, clip_range=0.3, clip_range_vf=0.3)
+        model = PPO(CustomPolicy, env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.99, clip_range=0.3)
     else:
         print("PPO old algorithm:")
         model = PPO.load(args.model_path, env)
+elif args.algorithm == 'TRPO':
+    if not args.model_path:
+        print("TRPO new algorithm:")
+        model = TRPO(CustomPolicy, env, n_steps=n_steps, verbose=0, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.99)
+    else:
+        print("TRPO old algorithm:")
+        model = TRPO.load(args.model_path, env)
 elif args.algorithm == 'SAC':
     if not args.model_path:
         print("SAC new algorithm:")
-        model = SAC(CustomSACPolicy, env, verbose=0, train_freq=n_steps, ent_coef=2, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.99)
+        model = SAC(MlpPolicy, env, verbose=0, ent_coef="auto_0.5", tau=0.004, train_freq=n_steps, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.99)
     else:
         print("SAC old algorithm:")
         model = SAC.load(args.model_path, env)
 elif args.algorithm == 'TD3':
     if not args.model_path:
         print("TD3 new algorithm:")
-        model = TD3(MlpPolicy, env, verbose=0, train_freq=n_steps, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.98)
+        model = TD3(MlpPolicy, env, verbose=0, train_freq=n_steps, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.99)
     else:
         print("TD3 old algorithm:")
         model = TD3.load(args.model_path, env)
+elif args.algorithm == 'DQN':
+    if not args.model_path:
+        print("DQN new algorithm:")
+        model = DQN(CustomPolicy, env, verbose=0, train_freq=n_steps, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.97)
+    else:
+        print("DQN old algorithm:")
+        model = DQN.load(args.model_path, env)
 else:
     print("Wrong algorithm:")
     exit(0)
@@ -139,13 +120,14 @@ class TensorboardCallback(BaseCallback):
 
     def _on_rollout_end(self) -> None:
         env.reset()
+        # print(self.num_timesteps)
         pass
 
 
-for iteration in range(1000):
+for iteration in range(15):
     print("iteration: ", iteration, flush=True)
     print(model.get_parameters())
-    model.learn(total_timesteps=100000000, progress_bar=True, callback=TensorboardCallback())
+    model.learn(total_timesteps=150000000, progress_bar=True, callback=TensorboardCallback())
     model.save(modelsPath + modelName + str(iteration))
 
 

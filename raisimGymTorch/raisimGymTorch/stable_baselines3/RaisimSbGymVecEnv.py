@@ -22,8 +22,8 @@ class RaisimSbGymVecEnv(VecEnv):
         self.wrapper = impl
         self.num_obs = self.wrapper.getObDim()
         self.num_acts = self.wrapper.getActionDim()
-        self.observation_space = gym.spaces.Box(-np.full(self.num_obs, 20, np.float32), np.full(self.num_obs, 20, np.float32), dtype=np.float32)
-        self.action_space = gym.spaces.Box(-np.full(self.num_acts, 10, np.float32), np.full(self.num_acts, 10, np.float32), dtype=np.float32)
+        self.observation_space = gym.spaces.Box(-np.full(self.num_obs, 12, np.float32), np.full(self.num_obs, 12, np.float32), dtype=np.float32)
+        self.action_space = gym.spaces.Box(-np.full(self.num_acts, 4, np.float32), np.full(self.num_acts, 4, np.float32), dtype=np.float32)
         super(RaisimSbGymVecEnv, self).__init__(self.wrapper.getNumOfEnvs(), self.observation_space, self.action_space)
 
         self._observation = np.zeros([self.num_envs, self.num_obs], dtype=np.float32)

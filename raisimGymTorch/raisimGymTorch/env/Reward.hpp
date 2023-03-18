@@ -86,8 +86,10 @@ class Reward {
     return rewardMap_;
   }
 
+ public:
+    std::map<std::string, raisim::RewardElement> rewards_;
  private:
-  std::map<std::string, raisim::RewardElement> rewards_;
+
   std::map<std::string, float> costSum_;
   std::map<std::string, float> rewardMap_;
 };

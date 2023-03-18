@@ -115,7 +115,7 @@ namespace raisim {
         float step(const Eigen::Ref<EigenVec>& action) final {
 /// action scaling
             pTarget12_ = action.cast<double>();
-            pTarget12_ = pTarget12_.cwiseProduct(actionStd_); // тут мы хотим чтобы действие совершалось не до конца
+//            pTarget12_ = pTarget12_.cwiseProduct(actionStd_); // тут мы хотим чтобы действие совершалось не до конца
             pTarget12_ += actionMean_;
             pTarget_.tail(nJoints_) = pTarget12_;
             anymal_->setPdTarget(pTarget_, vTarget_);
@@ -200,7 +200,7 @@ namespace raisim {
             anymal_->getState(gc_, gv_);
             obDouble_ << stepHeight_, stepWidth_, gv_, gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
 //            obDouble_ << stepHeight_, stepWidth_, gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
-
+            actionMean_ = gc_;
         }
 
         float getX()
