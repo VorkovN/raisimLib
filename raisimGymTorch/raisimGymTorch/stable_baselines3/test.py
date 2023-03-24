@@ -47,10 +47,7 @@ elif args.environment_type == 'run':
 elif args.environment_type == 'turn':
     from raisimGymTorch.env.bin import anymal_turn as rsg_anymal
 
-env = VecEnv(rsg_anymal.RaisimGymEnv(rscPath, dump(cfg['environment'], Dumper=RoundTripDumper)), normalize_ob=True)
-obs = env.reset()
-
-n_steps = int(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
+env = VecEnv(rsg_anymal.RaisimGymEnv(rscPath, dump(cfg['environment'], Dumper=RoundTripDumper)))
 
 if args.algorithm == 'PPO':
         print("PPO old algorithm:")
@@ -71,17 +68,17 @@ else:
     print("Wrong algorithm:")
     exit(0)
 
-for iteration in range(1000):
+for iteration in range(500):
     print("iteration: ", iteration, flush=True)
     env.turn_on_visualization()
     env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(iteration)+'.mp4')
 
-    for step in range(n_steps*2):
+    obs = env.reset()
+    for step in range(n_steps):
             print("step: ", step)
             frame_start = time.time()
-            action, _state = model.predict(obs, deterministic=True)
+            action, _state = model.predict(obs, deterministic=False)
             obs, reward, done, info = env.step(action)
-            print(obs)
             frame_end = time.time()
             wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
             if wait_time > 0.:

@@ -1,6 +1,7 @@
 import gym
 import os
 import datetime
+import time
 import argparse
 from ruamel.yaml import YAML, dump, RoundTripDumper
 
@@ -10,7 +11,7 @@ from stable_baselines3 import PPO
 from sb3_contrib import TRPO
 from stable_baselines3 import SAC
 from stable_baselines3 import TD3
-from stable_baselines3 import DQN
+from stable_baselines3 import A2C
 
 from raisimGymTorch.stable_baselines3.RaisimSbGymVecEnv import RaisimSbGymVecEnv as VecEnv
 from stable_baselines3.common.callbacks import BaseCallback
@@ -42,8 +43,8 @@ elif args.algorithm == 'SAC':
     from stable_baselines3.sac.policies import MlpPolicy, SACPolicy, MultiInputPolicy
 elif args.algorithm == 'TD3':
     from stable_baselines3.td3.policies import MlpPolicy
-elif args.algorithm == 'DQN':
-    from stable_baselines3.dqn.policies import MlpPolicy
+elif args.algorithm == 'A2C':
+    from stable_baselines3.a2c.policies import MlpPolicy
 else:
     print("Wrong algorithm:")
     exit(0)
@@ -58,7 +59,7 @@ elif args.environment_type == 'turn':
     from raisimGymTorch.env.bin import anymal_turn as rsg_anymal
 
 env = VecEnv(rsg_anymal.RaisimGymEnv(rscPath, dump(cfg['environment'], Dumper=RoundTripDumper)))
-env.reset()
+obs = env.reset()
 class CustomPolicy(MlpPolicy):
     def __init__(self, *args, **kwargs):
         super(CustomPolicy, self).__init__(*args, **kwargs, net_arch=dict(pi=[128, 128], vf=[128, 128]))
@@ -70,7 +71,7 @@ class CustomSACPolicy(MlpPolicy):
 if args.algorithm == 'PPO':
     if not args.model_path:
         print("PPO new algorithm:")
-        model = PPO(CustomPolicy, env, n_steps=n_steps, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.99, clip_range=0.3)
+        model = PPO(CustomPolicy, env, n_steps=n_steps, ent_coef=0.005, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.995, clip_range=0.4)
     else:
         print("PPO old algorithm:")
         model = PPO.load(args.model_path, env)
@@ -84,7 +85,7 @@ elif args.algorithm == 'TRPO':
 elif args.algorithm == 'SAC':
     if not args.model_path:
         print("SAC new algorithm:")
-        model = SAC(MlpPolicy, env, verbose=0, ent_coef="auto_0.5", tau=0.004, train_freq=n_steps, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.99)
+        model = SAC(MlpPolicy, env, verbose=0, ent_coef="auto_0.005", tau=0.001, train_freq=n_steps, batch_size=batch_size*4, tensorboard_log=logsPath, gamma=0.995)
     else:
         print("SAC old algorithm:")
         model = SAC.load(args.model_path, env)
@@ -95,13 +96,13 @@ elif args.algorithm == 'TD3':
     else:
         print("TD3 old algorithm:")
         model = TD3.load(args.model_path, env)
-elif args.algorithm == 'DQN':
+elif args.algorithm == 'A2C':
     if not args.model_path:
-        print("DQN new algorithm:")
-        model = DQN(CustomPolicy, env, verbose=0, train_freq=n_steps, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.97)
+        print("A2C new algorithm:")
+        model = A2C(CustomPolicy, env, verbose=0, ent_coef=0.1, tensorboard_log=logsPath, gamma=0.99)
     else:
-        print("DQN old algorithm:")
-        model = DQN.load(args.model_path, env)
+        print("A2C old algorithm:")
+        model = A2C.load(args.model_path, env)
 else:
     print("Wrong algorithm:")
     exit(0)
@@ -124,10 +125,27 @@ class TensorboardCallback(BaseCallback):
         pass
 
 
-for iteration in range(15):
+for iteration in range(5):
     print("iteration: ", iteration, flush=True)
     print(model.get_parameters())
     model.learn(total_timesteps=150000000, progress_bar=True, callback=TensorboardCallback())
     model.save(modelsPath + modelName + str(iteration))
+
+    obs = env.reset()
+    for iteration in range(5):
+        print("iteration: ", iteration, flush=True)
+        env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(iteration)+'.mp4')
+
+        for step in range(n_steps):
+            print("step: ", step)
+            frame_start = time.time()
+            action, _state = model.predict(obs, deterministic=False)
+            obs, reward, done, info = env.step(action)
+            frame_end = time.time()
+            wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
+            if wait_time > 0.:
+                time.sleep(wait_time)
+
+        env.stop_video_recording()
 
 

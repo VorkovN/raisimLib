@@ -107,6 +107,10 @@ namespace raisim {
 
         void init() final { }
 
+        float normalizeReward(float x, float coeff) {
+            return (1./coeff-x*x);
+        }
+
         void reset() final {
             anymal_->setState(gc_init_, gv_init_);
             updateObservation();
@@ -137,34 +141,53 @@ namespace raisim {
             raisim::Vec<3> footPositionRB;
             anymal_->getFramePosition(footIdRB_, footPositionRB);
 
-            float footDeviationY = (gc_[1]-dy_-footPositionLF[1])*(gc_[1]-dy_-footPositionLF[1])+(gc_[1]+dy_-footPositionRF[1])*(gc_[1]+dy_-footPositionRF[1])+(gc_[1]-dy_-footPositionLB[1])*(gc_[1]-dy_-footPositionLB[1])+(gc_[1]+dy_-footPositionRB[1])*(gc_[1]+dy_-footPositionRB[1]);
-            float frontFeetDX = (gc_[0]+1.5*dx_-footPositionLF[0])*(gc_[0]+1.5*dx_-footPositionLF[0]) + (gc_[0]+1.5*dx_-footPositionRF[0])*(gc_[0]+1.5*dx_-footPositionRF[0]);
-            float frontFeetDZ = (gc_[2]-footPositionLF[2])*(gc_[2]-footPositionLF[2]) + (gc_[2]-footPositionRF[2])*(gc_[2]-footPositionRF[2]);  
-            float backFeetDX = (gc_[0]-dx_-footPositionLB[0])*(gc_[0]-dx_-footPositionLB[0]) + (gc_[0]-dx_-footPositionRB[0])*(gc_[0]-dx_-footPositionRB[0]);
-            float backFeetDZ = (gc_[2]-footPositionLB[2])*(gc_[2]-footPositionLB[2]) + (gc_[2]-footPositionRB[2])*(gc_[2]-footPositionRB[2]);
-            float torque = anymal_->getGeneralizedForce().squaredNorm();
-            float xVelocity = std::min(3.0, gv_[0]);
-            float xAngular = gv_[3]*gv_[3];
-            float yVelocity = gv_[1]*gv_[1];
-            float yAngular = (gc_[5]/gc_[3]-targetAngularY_)*(gc_[5]/gc_[3]-targetAngularY_);
-            float zVelocity = std::min(3.0, gv_[2]);
-            float zAngular = gv_[5]*gv_[5];
-            float xCoord = gc_[0];
-            float zCoord = gc_[2];
-
+            float footDeviationY = normalizeReward((gc_[7]), rewards_.rewards_["footDeviationY"].coefficient)/4
+                                 + normalizeReward((gc_[10]), rewards_.rewards_["footDeviationY"].coefficient)/4
+                                 + normalizeReward((gc_[13]), rewards_.rewards_["footDeviationY"].coefficient)/4
+                                 + normalizeReward((gc_[16]), rewards_.rewards_["footDeviationY"].coefficient)/4;
             rewards_.record("footDeviationY", footDeviationY);
+
+            float frontFeetDX = normalizeReward(gc_[0]+1.5*dx_-footPositionLF[0], rewards_.rewards_["frontFeetDX"].coefficient)
+                              + normalizeReward(gc_[0]+1.5*dx_-footPositionRF[0], rewards_.rewards_["frontFeetDX"].coefficient);
             rewards_.record("frontFeetDX", frontFeetDX);
+
+            float frontFeetDZ = normalizeReward(gc_[2]-footPositionLF[2], rewards_.rewards_["frontFeetDZ"].coefficient)
+                              + normalizeReward(gc_[2]-footPositionRF[2], rewards_.rewards_["frontFeetDZ"].coefficient);
             rewards_.record("frontFeetDZ", frontFeetDZ);
+
+            float backFeetDX = normalizeReward(gc_[0]-dx_-footPositionLB[0], rewards_.rewards_["backFeetDX"].coefficient)
+                             + normalizeReward(gc_[0]-dx_-footPositionRB[0], rewards_.rewards_["backFeetDX"].coefficient);
             rewards_.record("backFeetDX", backFeetDX);
+
+            float backFeetDZ = normalizeReward(gc_[2]-footPositionLB[2], rewards_.rewards_["backFeetDZ"].coefficient)
+                             + normalizeReward(gc_[2]-footPositionRB[2], rewards_.rewards_["backFeetDZ"].coefficient);
             rewards_.record("backFeetDZ", backFeetDZ);
+
+            float torque = anymal_->getGeneralizedForce().squaredNorm();
             rewards_.record("torque", torque);
+
+            float xVelocity = std::min(3.0, gv_[0]);
             rewards_.record("xVelocity", xVelocity);
-	        rewards_.record("xAngular", xAngular);
-	        rewards_.record("yVelocity", yVelocity);
+
+            float xAngular = normalizeReward(gv_[3], rewards_.rewards_["xAngular"].coefficient);
+            rewards_.record("xAngular", xAngular);
+
+            float yVelocity = normalizeReward(gv_[1], rewards_.rewards_["yVelocity"].coefficient);
+            rewards_.record("yVelocity", yVelocity);
+
+            float yAngular = normalizeReward(gc_[5]/gc_[3]-targetAngularY_, rewards_.rewards_["yAngular"].coefficient);
             rewards_.record("yAngular", yAngular);
+
+            float zVelocity = std::min(3.0, gv_[2]);
             rewards_.record("zVelocity", zVelocity);
+
+            float zAngular = normalizeReward(gv_[5], rewards_.rewards_["zAngular"].coefficient);
             rewards_.record("zAngular", zAngular);
+
+            float xCoord = gc_[0];
             rewards_.record("xCoord", xCoord, true);
+
+            float zCoord = gc_[2];
             rewards_.record("zCoord", zCoord, true);
 
             static int counter = 0;
@@ -255,13 +278,13 @@ namespace raisim {
         bool visualizable_ = false;
         raisim::ArticulatedSystem* anymal_;
         Eigen::VectorXd gc_init_, gv_init_, gc_, gv_, pTarget_, pTarget12_, vTarget_;
-        double terminalRewardCoeff_ = -200;
+        double terminalRewardCoeff_ = -800;
         Eigen::VectorXd actionMean_, actionStd_, obDouble_;
         float stepHeight_;
         float stepWidth_;
         float targetAngularY_;
         float dx_ = 0.325;
-        float dy_ = 0.15;
+        float dy_ = 0.14;
         size_t footIdLF_ = 9;
         size_t footIdRF_ = 12;
         size_t footIdLB_ = 15;

@@ -17,17 +17,17 @@ environment:
     feetDZ:
       coeff: 40.0
     xVelocity:
-      coeff: 10.5
+      coeff: 12.0
     xAngular:
-      coeff: 15.5
+      coeff: 20.5
     yVelocity:
-      coeff: 25.5
+      coeff: 40.0
     yAngular:
-      coeff: 122.0
+      coeff: 112.0
     zCoord:
-      coeff: 228.0
+      coeff: 500.0
     zAngular:
       coeff: 20.5
     torque:
-      coeff: -0.00001
+      coeff: -0.00005
 
