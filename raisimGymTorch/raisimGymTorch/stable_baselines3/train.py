@@ -71,14 +71,14 @@ class CustomSACPolicy(MlpPolicy):
 if args.algorithm == 'PPO':
     if not args.model_path:
         print("PPO new algorithm:")
-        model = PPO(CustomPolicy, env, n_steps=n_steps, ent_coef=0.005, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.995, clip_range=0.4)
+        model = PPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.97, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.996, clip_range=0.3)
     else:
         print("PPO old algorithm:")
         model = PPO.load(args.model_path, env)
 elif args.algorithm == 'TRPO':
     if not args.model_path:
         print("TRPO new algorithm:")
-        model = TRPO(CustomPolicy, env, n_steps=n_steps, verbose=0, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.99)
+        model = TRPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.97, verbose=0, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.996)
     else:
         print("TRPO old algorithm:")
         model = TRPO.load(args.model_path, env)
@@ -125,14 +125,14 @@ class TensorboardCallback(BaseCallback):
         pass
 
 
-for iteration in range(5):
+for iteration in range(15):
     print("iteration: ", iteration, flush=True)
     print(model.get_parameters())
     model.learn(total_timesteps=150000000, progress_bar=True, callback=TensorboardCallback())
     model.save(modelsPath + modelName + str(iteration))
 
     obs = env.reset()
-    for iteration in range(5):
+    for iteration in range(3):
         print("iteration: ", iteration, flush=True)
         env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(iteration)+'.mp4')
 

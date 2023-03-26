@@ -44,7 +44,7 @@ class VectorizedEnvironment {
     environments_.reserve(num_envs_);
     rewardInformation_.reserve(num_envs_);
     for (int i = 0; i < num_envs_; i++) {
-      environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && i < 1, i % 1));
+      environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && i < 5, i % 5));
       environments_.back()->setSimulationTimeStep(cfg_["simulation_dt"].template As<double>());
       environments_.back()->setControlTimeStep(cfg_["control_dt"].template As<double>());
       rewardInformation_.push_back(environments_.back()->getRewards().getStdMap());
