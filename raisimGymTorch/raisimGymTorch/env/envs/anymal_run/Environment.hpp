@@ -20,7 +20,7 @@ namespace raisim {
 
             /// create world
             world_ = std::make_unique<raisim::World>();
-            world_->setDefaultMaterial(3.0, 0.0, 0.0);
+            world_->setDefaultMaterial(4.0, 0.0, 0.0);
             /// add objects
             anymal_ = world_->addArticulatedSystem(resourceDir_+"/aliengo/aliengo.urdf");
             anymal_->setName("anymal");
@@ -59,8 +59,8 @@ namespace raisim {
             anymal_->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
 
             /// MUST BE DONE FOR ALL ENVIRONMENTS
-//            obDim_ = 38;
-            obDim_ = 26;
+            obDim_ = 38;
+//            obDim_ = 26;
             actionDim_ = nJoints_; actionMean_.setZero(actionDim_); actionStd_.setZero(actionDim_);
             obDouble_.setZero(obDim_);
 
@@ -188,7 +188,7 @@ namespace raisim {
 
         void updateObservation() {
             anymal_->getState(gc_, gv_);
-            obDouble_ << stepHeight_, stepWidth_, gv_.head(6), gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
+            obDouble_ << stepHeight_, stepWidth_, gv_, gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
 //            obDouble_ << stepHeight_, stepWidth_, gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
             actionMean_ = gc_;
         }

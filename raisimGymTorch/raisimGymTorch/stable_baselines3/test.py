@@ -49,24 +49,33 @@ elif args.environment_type == 'turn':
 
 env = VecEnv(rsg_anymal.RaisimGymEnv(rscPath, dump(cfg['environment'], Dumper=RoundTripDumper)))
 
+model_load_path = os.path.join(args.model_path)
+
 if args.algorithm == 'PPO':
         print("PPO old algorithm:")
-        model = PPO.load(args.model_path, env)
+        model = PPO.load(model_load_path, env)
 elif args.algorithm == 'TRPO':
         print("TRPO old algorithm:")
-        model = TRPO.load(args.model_path, env)
+        model = TRPO.load(model_load_path, env)
 elif args.algorithm == 'SAC':
         print("SAC old algorithm:")
-        model = SAC.load(args.model_path, env)
+        model = SAC.load(model_load_path, env)
 elif args.algorithm == 'TD3':
         print("TD3 old algorithm:")
-        model = TD3.load(args.model_path, env)
+        model = TD3.load(model_load_path, env)
 elif args.algorithm == 'DQN':
         print("DQN old algorithm:")
-        model = DQN.load(args.model_path, env)
+        model = DQN.load(model_load_path, env)
 else:
     print("Wrong algorithm:")
     exit(0)
+
+model = PPO.load(model_load_path, env=env)
+
+print(model.get_parameters())
+print("AAAAAAA")
+model.set_parameters(model_load_path)
+print(model.get_parameters())
 
 for iteration in range(500):
     print("iteration: ", iteration, flush=True)
@@ -75,7 +84,7 @@ for iteration in range(500):
 
     obs = env.reset()
     for step in range(n_steps):
-            print("step: ", step)
+            # print("step: ", step)
             frame_start = time.time()
             action, _state = model.predict(obs, deterministic=False)
             obs, reward, done, info = env.step(action)

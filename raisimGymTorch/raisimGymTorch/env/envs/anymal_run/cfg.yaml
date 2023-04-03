@@ -17,7 +17,7 @@ environment:
     feetDZ:
       coeff: 50.0
     backFeetDX:
-      coeff: 20.0
+      coeff: 50.0
     xVelocity:
       coeff: 15.5
 #    xAngular:
