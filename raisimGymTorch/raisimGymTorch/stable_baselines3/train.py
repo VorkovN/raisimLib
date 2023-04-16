@@ -32,7 +32,7 @@ logsPath = baselineDataPath
 
 cfg = YAML().load(open(taskPath + "/cfg.yaml", 'r'))
 n_steps = int(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
-batch_size = int(n_steps*cfg['environment']['num_envs']/8)
+batch_size = int(n_steps*cfg['environment']['num_envs'])
 model_load_path = os.path.join(args.model_path)
 
 if args.algorithm == 'PPO':
@@ -62,7 +62,7 @@ env = VecEnv(rsg_anymal.RaisimGymEnv(rscPath, dump(cfg['environment'], Dumper=Ro
 obs = env.reset()
 class CustomPolicy(MlpPolicy):
     def __init__(self, *args, **kwargs):
-        super(CustomPolicy, self).__init__(*args, **kwargs, net_arch=dict(pi=[120, 120], vf=[120, 120]))
+        super(CustomPolicy, self).__init__(*args, **kwargs, net_arch=dict(pi=[200, 200], vf=[200, 200]))
 
 class CustomSACPolicy(MlpPolicy):
     def __init__(self, *args, **kwargs):
@@ -71,7 +71,7 @@ class CustomSACPolicy(MlpPolicy):
 if args.algorithm == 'PPO':
     if not args.model_path:
         print("PPO new algorithm:")
-        model = PPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.98, verbose=0, batch_size=batch_size, n_epochs=6, tensorboard_log=logsPath, gamma=0.998, clip_range=0.999, target_kl=0.03)
+        model = PPO(CustomPolicy, env, n_steps=n_steps, ent_coef=2.0, gae_lambda=0.97, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.997, clip_range=5.0)
     else:
         print("PPO old algorithm:")
         model = PPO.load(model_load_path, env)
@@ -80,7 +80,7 @@ if args.algorithm == 'PPO':
 elif args.algorithm == 'TRPO':
     if not args.model_path:
         print("TRPO new algorithm:")
-        model = TRPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.98, verbose=0, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.998, target_kl=0.02)
+        model = TRPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.98, verbose=0, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.998, target_kl=0.04, device='cuda:1')
     else:
         print("TRPO old algorithm:")
         model = TRPO.load(model_load_path, env)
@@ -89,7 +89,7 @@ elif args.algorithm == 'TRPO':
 elif args.algorithm == 'SAC':
     if not args.model_path:
         print("SAC new algorithm:")
-        model = SAC(MlpPolicy, env, verbose=0, ent_coef="auto_2", tau=0.002, train_freq=n_steps, batch_size=batch_size*4, tensorboard_log=logsPath, gamma=0.995)
+        model = SAC(MlpPolicy, env, verbose=0, ent_coef="auto_1", tau=0.005, train_freq=n_steps, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.997)
     else:
         print("SAC old algorithm:")
         model = SAC.load(model_load_path, env)
@@ -137,7 +137,7 @@ class TensorboardCallback(BaseCallback):
 for iteration in range(15):
     print("iteration: ", iteration, flush=True)
     print(model.get_parameters())
-    model.learn(total_timesteps=200000000, progress_bar=True, callback=TensorboardCallback())
+    model.learn(total_timesteps=150000000, progress_bar=True, callback=TensorboardCallback())
     model.save(modelsPath + modelName + str(iteration))
     policy = model.policy
     policy.save(modelsPath + modelName + str(iteration) + "Policy")

@@ -6,30 +6,47 @@ environment:
   # just testing commenting
   num_envs: 100
   eval_every_n: 200
-  num_threads: 10
+  num_threads: 8
   simulation_dt: 0.0025
-  control_dt: 0.01
-  max_time: 16.0
+  control_dt: 0.0025
+  max_time: 10.0
   action_std: 0.5
+
   reward:
+
+    oneStepFront:
+      coeff: 10.0
+    oneStepBack:
+      coeff: 10.0
+
     footDeviationY:
-      coeff: 120.0
-    feetDZ:
-      coeff: 50.0
-    backFeetDX:
-      coeff: 50.0
-    xVelocity:
-      coeff: 15.5
-#    xAngular:
-#      coeff: 15.5
-    yVelocity:
       coeff: 30.0
+
+    footVelocityFront:
+      coeff: 10.0
+    footVelocityBack:
+      coeff: 10.0
+
+    leftBackFeetDX:
+      coeff: 300.0
+    rightBackFeetDX:
+      coeff: 350.0
+
+    xVelocity:
+      coeff: 70.0
+    xAngular:
+      coeff: 120.0
+    yVelocity:
+      coeff: 150.0
     yAngular:
-      coeff: 152.0
-    zCoord:
-      coeff: 288.0
+      coeff: 350.0
     zAngular:
-      coeff: 20.5
+      coeff: 350.0
     torque:
-      coeff: -0.0001
+      coeff: -0.00005
+    xCoord:
+      coeff: 0.0001
+    zCoord:
+      coeff: 400
+
 

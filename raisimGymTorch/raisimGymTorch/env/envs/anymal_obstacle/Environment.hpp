@@ -20,27 +20,25 @@ namespace raisim {
 
             /// create world
             world_ = std::make_unique<raisim::World>();
-	        world_->setDefaultMaterial(3.0, 0.0, 0.0);
+	    world_->setDefaultMaterial(2.0, 0.0, 0.0);
             /// add objects
             anymal_ = world_->addArticulatedSystem(resourceDir_+"/aliengo/aliengo.urdf");
             anymal_->setName("anymal");
             anymal_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
-            world_->addGround();
+            ///world_->addGround();
+    	raisim::TerrainProperties terrainProperties;  // Randomized terrain
+    	terrainProperties.frequency = 2.5;
+    	terrainProperties.zScale = 0.25;
+    	terrainProperties.xSize = 15.0;
+    	terrainProperties.ySize = 15.0;
+    	terrainProperties.xSamples = 200;
+    	terrainProperties.ySamples = 200;
+    	terrainProperties.fractalOctaves = 8;
+    	terrainProperties.fractalLacunarity = 4.0;
+    	terrainProperties.fractalGain = 0.9;
+    	auto hm = world_->addHeightMap(0.0, 0.0, terrainProperties);
 
-            srand (seed_);
-
-            stepHeight_ = float(std::rand()%2)/100+0.16;
-            stepWidth_ = float(std::rand()%2)/100+0.28;
-
-            float mass = 1;
-            float stairY = 0;
-            float stairWidth = 1.5;
-            float startDistanceToObstacle = dx_+stepWidth_/2;
-
-            auto box = world_->addBox(stepWidth_, stairWidth, stepHeight_, mass);
-            box->setPosition(raisim::Vec<3>{startDistanceToObstacle, stairY, stepHeight_*0.5});
-            box->setBodyType(raisim::BodyType::STATIC);
-
+            
             /// get robot data
             gcDim_ = anymal_->getGeneralizedCoordinateDim();
             gvDim_ = anymal_->getDOF();
@@ -53,25 +51,34 @@ namespace raisim {
 
             switch (seed_) {
                 case 0:
-                    gc_init_ << 0.0, 0.0, 0.38, 1.0, 0.0, 0.0, 0.0, 0.0, 0.9, -1.5, 0.0, 0.9, -1.5, 0.0, 0.8, -1.6, 0.0, 0.8, -1.6; //обычная стойка
+                    gc_init_ << 0.0, 0.0, 0.429+0.15, 1.0, 0.0, -0.02, 0.0, -0.05, 0.5, -1.2, 0.05, 0.5, -1.2, -0.05, 0.6, -1.3, 0.05, 0.6, -1.3;
                     break;
                 case 1:
-                    gc_init_ << 0.0, 0.0, 0.43, 1.0, 0.0, -atan(stepHeight_/stepWidth_)/3.14/3, 0.0, 0.0, 0.7, -1.0, 0.0, 0.4, -1.9, 0.0, 0.9, -1.3, 0.0, 0.9, -1.3; //одна лапа на первой ступени
+                    gc_init_ << 0.0, 0.0, 0.428+0.15, 1.0, 0.0, -0.005, 0.0, -0.0, 0.5, -1.2, 0.0, 0.5, -1.2, -0.0, 0.6, -1.3, 0.0, 0.6, -1.3;
                     break;
                 case 2:
-                    gc_init_ << stepWidth_/2, 0.0, 0.477, 1.0, 0.0, -atan(stepHeight_/stepWidth_)/3.14/4, 0.0, 0.0, 0.9, -1.9, 0.0, 0.9, -1.9, 0.0, 0.8, -0.9, 0.0, 0.8, -0.9; //нижняя стойка на первой ступени
+                    gc_init_ << 0.0, 0.0, 0.427+0.15, 1.0, 0.0, 0.0, 0.0, -0.0, 0.5, -1.2, 0.0, 0.5, -1.2, -0.0, 0.4, -1.2, 0.0, 0.4, -1.2;
+                    break;
+                case 3:
+                    gc_init_ << 0.0, 0.0, 0.37+0.15, 1.0, 0.0, 0.0, 0.0, -0.0, 0.8, -1.6, 0.0, 0.8, -1.6, -0.0, 0.8, -1.6, 0.0, 0.8, -1.6;
+                    break;
+                case 4:
+                    gc_init_ << 0.0, 0.0, 0.49+0.15, 1.0, 0.0, 0.0, 0.0, -0.0, 0.3, -0.7, 0.0, 0.3, -0.7, -0.0, 0.3, -0.7, 0.0, 0.3, -0.7;
+                    break;
+                case 5:
+                    gc_init_ << 0.0, 0.0, 0.428+0.15, 1.0, 0.0, -0.005, 0.0, -0.0, 0.5, -1.2, 0.0, 0.5, -1.2, -0.0, 0.6, -1.3, 0.0, 0.6, -1.3;
                     break;
             }
 
             /// set pd gains
             Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
-            jointPgain.setZero(); jointPgain.tail(nJoints_).setConstant(40.0);
-            jointDgain.setZero(); jointDgain.tail(nJoints_).setConstant(1.0);
+            jointPgain.setZero(); jointPgain.tail(nJoints_).setConstant(50.0);
+            jointDgain.setZero(); jointDgain.tail(nJoints_).setConstant(0.5);
             anymal_->setPdGains(jointPgain, jointDgain);
             anymal_->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
 
             /// MUST BE DONE FOR ALL ENVIRONMENTS
-            obDim_ = 38;
+            obDim_ = 36;
 //            obDim_ = 26;
             actionDim_ = nJoints_; actionMean_.setZero(actionDim_); actionStd_.setZero(actionDim_);
             obDouble_.setZero(obDim_);
@@ -87,23 +94,17 @@ namespace raisim {
             /// visualize if it is the first environment
             if (visualizable_) {
                 server_ = std::make_unique<raisim::RaisimServer>(world_.get());
-                server_->launchServer(8080+seed_);
+                server_->launchServer(8090+seed_);
                 server_->focusOn(anymal_);
             }
 
             flySteps_ = 0;
         }
 
-        float getGoalFootHeight(float x)
-        {
-            return std::max(float(0), static_cast<float>( stepHeight_ * static_cast<int>((x-dx_-0.3*stepWidth_) / stepWidth_ + 1) ) // целая ступень
-                                    + static_cast<float>(pow(fmod((x-dx_-0.3*stepWidth_), stepWidth_), 4)) / static_cast<float>(pow(stepHeight_, 3))); // остаток в виде экспоненты
-        }
-
         void init() final { }
 
-        float normalizeReward(float x, float coeff) {
-            return (1./coeff-x*x);
+        double normalizeReward(double x, double coeff) {
+            return (5.0/coeff-x*x);
         }
 
         void reset() final {
@@ -128,152 +129,122 @@ namespace raisim {
 
             updateObservation();
 
-            raisim::Vec<3> footPositionLF;
-            anymal_->getFramePosition(footIdLF_, footPositionLF);
-            raisim::Vec<3> footPositionRF;
-            anymal_->getFramePosition(footIdRF_, footPositionRF);
-            raisim::Vec<3> footPositionLB;
-            anymal_->getFramePosition(footIdLB_, footPositionLB);
-            raisim::Vec<3> footPositionRB;
-            anymal_->getFramePosition(footIdRB_, footPositionRB);
+            raisim::Vec<3> footPositionLF; anymal_->getFramePosition(footIdLF_, footPositionLF);
+            raisim::Vec<3> footPositionRF; anymal_->getFramePosition(footIdRF_, footPositionRF);
+            raisim::Vec<3> footPositionLB; anymal_->getFramePosition(footIdLB_, footPositionLB);
+            raisim::Vec<3> footPositionRB; anymal_->getFramePosition(footIdRB_, footPositionRB);
 
-            raisim::Vec<3> footVelocityLF;
-            anymal_->getFrameVelocity(footIdLF_, footVelocityLF);
-            raisim::Vec<3> footVelocityRF;
-            anymal_->getFrameVelocity(footIdRF_, footVelocityRF);
-            raisim::Vec<3> footVelocityLB;
-            anymal_->getFrameVelocity(footIdLB_, footVelocityLB);
-            raisim::Vec<3> footVelocityRB;
-            anymal_->getFrameVelocity(footIdRB_, footVelocityRB);
+            raisim::Vec<3> footVelocityLF; anymal_->getFrameVelocity(footIdLF_, footVelocityLF);
+            raisim::Vec<3> footVelocityRF; anymal_->getFrameVelocity(footIdRF_, footVelocityRF);
+            raisim::Vec<3> footVelocityLB; anymal_->getFrameVelocity(footIdLB_, footVelocityLB);
+            raisim::Vec<3> footVelocityRB; anymal_->getFrameVelocity(footIdRB_, footVelocityRB);
 
-            bool isLeftFrontFeetContact = false;
-            bool isRightFrontFeetContact = false;
-            bool isLeftBackFeetContact = false;
-            bool isRightBackFeetContact = false;
-            auto& contacts = anymal_->getContacts();
-            for (auto& contact: contacts)
-            {
-                if ((contact.getlocalBodyIndex() == footIdLF_ - 6) && (contact.getPairObjectBodyType() == raisim::BodyType::STATIC))
-                    isLeftFrontFeetContact = true;
+            double oneStepFront = 0;
+            if (footVelocityLF[0] + abs(footVelocityLF[2]) > 0.5 && (footVelocityLF[0] - footVelocityRF[0] < 0.1))
+                oneStepFront = normalizeReward(footVelocityRF[0] + abs(footVelocityRF[2]), rewards_.rewards_["oneStepFront"].coefficient);
+            if (footVelocityRF[0] + abs(footVelocityRF[2]) > 0.5 && (footVelocityRF[0] - footVelocityLF[0] < 0.1))
+                oneStepFront = normalizeReward(footVelocityLF[0] + abs(footVelocityLF[2]), rewards_.rewards_["oneStepFront"].coefficient);
+            rewards_.record("oneStepFront", oneStepFront);
 
-                if ((contact.getlocalBodyIndex() == footIdRF_ - 6) && (contact.getPairObjectBodyType() == raisim::BodyType::STATIC))
-                    isRightFrontFeetContact = true;
+            double oneStepBack = 0;
+            if (footVelocityRB[0] + abs(footVelocityRB[2]) > 0.5 && (footVelocityLB[0] - footVelocityRB[0] < 0.1))
+                oneStepBack = normalizeReward(footVelocityLB[0] + abs(footVelocityLB[2]), rewards_.rewards_["oneStepBack"].coefficient);
+            if (footVelocityLB[0] + abs(footVelocityLB[2]) > 0.5 && (footVelocityRB[0] - footVelocityLB[0] < 0.1))
+                oneStepBack = normalizeReward(footVelocityRB[0] + abs(footVelocityRB[2]), rewards_.rewards_["oneStepBack"].coefficient);
+            rewards_.record("oneStepBack", oneStepBack);
 
-                if ((contact.getlocalBodyIndex() == footIdLB_ - 6) && (contact.getPairObjectBodyType() == raisim::BodyType::STATIC))
-                    isLeftBackFeetContact = true;
 
-                if ((contact.getlocalBodyIndex() == footIdRB_ - 6) && (contact.getPairObjectBodyType() == raisim::BodyType::STATIC))
-                    isRightBackFeetContact = true;
-            }
+            if (footVelocityLF[0] > 0.05)
+                rewards_.record("footVelocityFront", footVelocityLF[2]);
+            if (footVelocityRF[0] > 0.05)
+                rewards_.record("footVelocityFront", footVelocityRF[2]);
+            if (footVelocityLB[0] > 0.05)
+                rewards_.record("footVelocityBack", footVelocityLB[2]);
+            if (footVelocityRB[0] > 0.05)
+                rewards_.record("footVelocityBack", footVelocityRB[2]);
 
-            float footDeviationY = normalizeReward(gc_[7], rewards_.rewards_["footDeviationY"].coefficient)
-                                 + normalizeReward(gc_[10], rewards_.rewards_["footDeviationY"].coefficient)
-                                 + normalizeReward(gc_[13], rewards_.rewards_["footDeviationY"].coefficient)
-                                 + normalizeReward(gc_[16], rewards_.rewards_["footDeviationY"].coefficient);
+
+            double footDeviationY = normalizeReward(abs(gc_init_[7] - gc_[7]), rewards_.rewards_["footDeviationY"].coefficient)
+                                  + normalizeReward(abs(gc_init_[10] - gc_[10]), rewards_.rewards_["footDeviationY"].coefficient)
+                                  + normalizeReward(abs(gc_init_[13] - gc_[13]), rewards_.rewards_["footDeviationY"].coefficient)
+                                  + normalizeReward(abs(gc_init_[16] - gc_[16]), rewards_.rewards_["footDeviationY"].coefficient);
             rewards_.record("footDeviationY", footDeviationY);
 
-            float leftFrontFeetDX = normalizeReward(gc_[0]+1.8*dx_-footPositionLF[0], rewards_.rewards_["leftFrontFeetDX"].coefficient);
-            rewards_.record("leftFrontFeetDX", leftFrontFeetDX);
 
-            float leftBackFeetDX = normalizeReward(gc_[0]-0.4*dx_-footPositionLB[0], rewards_.rewards_["leftBackFeetDX"].coefficient);
+            double leftBackFeetDX = normalizeReward(gc_[0]-0.2*dx_-footPositionLB[0], rewards_.rewards_["leftBackFeetDX"].coefficient);
             rewards_.record("leftBackFeetDX", leftBackFeetDX);
 
-            float rightBackFeetDX = normalizeReward(gc_[0]-footPositionRB[0], rewards_.rewards_["rightBackFeetDX"].coefficient);
+            double rightBackFeetDX = normalizeReward(gc_[0]-0.2*dx_-footPositionRB[0], rewards_.rewards_["rightBackFeetDX"].coefficient);
             rewards_.record("rightBackFeetDX", rightBackFeetDX);
 
-            float rightFrontFeetDX = normalizeReward(gc_[0]+1.5*dx_-footPositionRF[0], rewards_.rewards_["rightFrontFeetDX"].coefficient);
-            rewards_.record("rightFrontFeetDX", rightFrontFeetDX);
-
-            float leftFrontFeetDZ = normalizeReward(getGoalFootHeight(footPositionLF[0]) - footPositionLF[2], rewards_.rewards_["leftFrontFeetDZ"].coefficient);
-            rewards_.record("leftFrontFeetDZ", leftFrontFeetDZ);
-
-            float rightFrontFeetDZ = normalizeReward(getGoalFootHeight(footPositionRF[0]) - footPositionRF[2], rewards_.rewards_["rightFrontFeetDZ"].coefficient);
-            rewards_.record("rightFrontFeetDZ", rightFrontFeetDZ);
-
-            float leftBackFeetDZ = normalizeReward(getGoalFootHeight(footPositionLB[0]) - footPositionLB[2], rewards_.rewards_["leftBackFeetDZ"].coefficient);
-            rewards_.record("leftBackFeetDZ", leftBackFeetDZ);
-
-            float rightBackFeetDZ = normalizeReward(getGoalFootHeight(footPositionRB[0]) - footPositionRB[2], rewards_.rewards_["rightBackFeetDZ"].coefficient);
-            rewards_.record("rightBackFeetDZ", rightBackFeetDZ);
-
-            float leftFrontFeetFold = 0;
-            if (!isLeftFrontFeetContact && footVelocityLF[2] > 0)
-                leftFrontFeetFold = normalizeReward(2+gc_[9], rewards_.rewards_["leftFrontFeetFold"].coefficient);
-            rewards_.record("leftFrontFeetFold", leftFrontFeetFold);
-
-            float rightFrontFeettFold = 0;
-            if (!isRightFrontFeetContact && footVelocityRF[2] > 0)
-                rightFrontFeettFold = normalizeReward(2+gc_[12], rewards_.rewards_["rightFrontFeettFold"].coefficient);
-            rewards_.record("rightFrontFeettFold", rightFrontFeettFold);
-
-            float leftBackFeetFold = 0;
-            if (!isLeftBackFeetContact && footVelocityLB[2] > 0)
-                leftBackFeetFold = normalizeReward(2+gc_[15], rewards_.rewards_["leftBackFeetFold"].coefficient);
-            rewards_.record("leftBackFeetFold", leftBackFeetFold);
-
-            float rightBackFeetFold = 0;
-            if (!isRightBackFeetContact && footVelocityRB[2] > 0)
-                rightBackFeetFold = normalizeReward(2+gc_[18], rewards_.rewards_["rightBackFeetFold"].coefficient);
-            rewards_.record("rightBackFeetFold", rightBackFeetFold);
-
-            float torque = anymal_->getGeneralizedForce().squaredNorm();
-            rewards_.record("torque", torque);
-
-            float xVelocity = std::min(1.0, gv_[0]);
+            double xVelocity = std::min(2.0, gv_[0]);
             rewards_.record("xVelocity", xVelocity);
 
-            float xAngular = normalizeReward(gc_[4]/gc_[3], rewards_.rewards_["xAngular"].coefficient);
+            double xAngular = normalizeReward(gv_[3], rewards_.rewards_["xAngular"].coefficient);
             rewards_.record("xAngular", xAngular);
 
-            float yVelocity = normalizeReward(gv_[1], rewards_.rewards_["yVelocity"].coefficient);
+            double yVelocity = normalizeReward(gv_[1], rewards_.rewards_["yVelocity"].coefficient);
             rewards_.record("yVelocity", yVelocity);
 
-            float zAngular = normalizeReward(gc_[6]/gc_[3], rewards_.rewards_["zAngular"].coefficient);
+            double yAngular = normalizeReward(gv_[4], rewards_.rewards_["yAngular"].coefficient);
+            rewards_.record("yAngular", yAngular);
+
+            double zAngular = normalizeReward(gv_[5], rewards_.rewards_["zAngular"].coefficient);
             rewards_.record("zAngular", zAngular);
 
-            float xCoord = gc_[0];
+            double xCoord = gc_[0];
             rewards_.record("xCoord", xCoord, true);
+
+            double zCoord = normalizeReward(gc_[2]-gc_init_[2], rewards_.rewards_["zCoord"].coefficient);
+            rewards_.record("zCoord", zCoord);
 
             static int counter = 0;
             if (counter++ % 98765 == 1)
             {
                 std::cout << "CURRENT REWARDS:\n";
+
+                std::cout << "oneStepFront: " << rewards_["oneStepFront"] << "\n";
+                std::cout << "oneStepBack: " << rewards_["oneStepBack"] << "\n";
+
                 std::cout << "footDeviationY: " << rewards_["footDeviationY"] << "\n";
+
                 std::cout << "leftFrontFeetDX: " << rewards_["leftFrontFeetDX"] << "\n";
                 std::cout << "rightFrontFeetDX: " << rewards_["rightFrontFeetDX"] << "\n";
                 std::cout << "leftBackFeetDX: " << rewards_["leftBackFeetDX"] << "\n";
                 std::cout << "rightBackFeetDX: " << rewards_["rightBackFeetDX"] << "\n";
 
-                std::cout << "leftFrontFeetDZ: " << rewards_["leftFrontFeetDZ"] << "\n";
-                std::cout << "rightFrontFeetDZ: " << rewards_["rightFrontFeetDZ"] << "\n";
-                std::cout << "leftBackFeetDZ: " << rewards_["leftBackFeetDZ"] << "\n";
-                std::cout << "rightBackFeetDZ: " << rewards_["rightBackFeetDZ"] << "\n";
-
-                std::cout << "leftFrontFeetFold: " << rewards_["leftFrontFeetFold"] << "\n";
-                std::cout << "rightFrontFeettFold: " << rewards_["rightFrontFeettFold"] << "\n";
-                std::cout << "leftBackFeetFold: " << rewards_["leftBackFeetFold"] << "\n";
-                std::cout << "rightBackFeetFold: " << rewards_["rightBackFeetFold"] << "\n";
-
-                std::cout << "torque: " << rewards_["torque"] << "\n";
                 std::cout << "xVelocity: " << rewards_["xVelocity"] << "\n";
                 std::cout << "xAngular: " << rewards_["xAngular"] << "\n";
                 std::cout << "yVelocity: " << rewards_["yVelocity"] << "\n";
+                std::cout << "yAngular: " << rewards_["yAngular"] << "\n";
                 std::cout << "zAngular: " << rewards_["zAngular"] << "\n";
                 std::cout << "xCoord: " << rewards_["xCoord"] << "\n";
+                std::cout << "zCoord: " << rewards_["zCoord"] << "\n";
 
-                std::cout << "ANGULAR:\n";
-                std::cout << gc_[3] << " " << gc_[4] << " " << gc_[5] << " " << gc_[6] << "\n";
+//                std::cout << "IS CONTACT:\n";
+//                std::cout << isLeftFrontFeetContact << " " << isRightFrontFeetContact << " " << isLeftBackFeetContact << " " << isRightBackFeetContact << "\n";
 
                 std::cout << "ACTIONS:\n";
                 std::cout << action[0] << " " << action[1] << " " << action[2] << " " << action[3] << " "
                           << action[4] << " " << action[5] << " " << action[6] << " " << action[7] << " "
                           << action[8] << " " << action[9] << " " << action[10] << " " << action[11] << "\n";
-                          
+
+                std::cout << "FOOT JOINT VELOS:\n";
+                std::cout << gv_[6] << " " << gv_[7] << " " << gv_[8] << "\n";
+                std::cout << gv_[9] << " " << gv_[10] << " " << gv_[11] << "\n";
+                std::cout << gv_[12] << " " << gv_[13] << " " << gv_[14] << "\n";
+                std::cout << gv_[15] << " " << gv_[16] << " " << gv_[17] << "\n";
+
                 std::cout << "FOOT POSITION:\n";
                 std::cout << footPositionLF[0] << " " << footPositionRF[0] << " " << footPositionLB[0] << " " << footPositionRB[0] << "\n";
                 std::cout << footPositionLF[1] << " " << footPositionRF[1] << " " << footPositionLB[1] << " " << footPositionRB[1] << "\n";
                 std::cout << footPositionLF[2] << " " << footPositionRF[2] << " " << footPositionLB[2] << " " << footPositionRB[2] << "\n";
-                
+
+                std::cout << "FOOT VELO:\n";
+                std::cout << footVelocityLF[0] << " " << footVelocityRF[0] << " " << footVelocityLB[0] << " " << footVelocityRB[0] << "\n";
+                std::cout << footVelocityLF[1] << " " << footVelocityRF[1] << " " << footVelocityLB[1] << " " << footVelocityRB[1] << "\n";
+                std::cout << footVelocityLF[2] << " " << footVelocityRF[2] << " " << footVelocityLB[2] << " " << footVelocityRB[2] << "\n";
+
                 std::cout.flush();
             }
 
@@ -282,7 +253,7 @@ namespace raisim {
 
         void updateObservation() {
             anymal_->getState(gc_, gv_);
-            obDouble_ << stepHeight_, stepWidth_, gv_, gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
+            obDouble_ << gv_, gc_.head(3), gc_[4]/gc_[3], gc_[5]/gc_[3], gc_[6]/gc_[3], gc_.tail(12);
             actionMean_ = gc_;
         }
 
@@ -304,8 +275,15 @@ namespace raisim {
         }
 
         bool isTerminalState(float& terminalReward) final {
+            if (!(gc_[2] > 0.3 && abs(gc_[6]/gc_[3]) < 0.4 && abs(gc_[4]/gc_[3]) < 0.4 && gc_[0] > -0.05))
+            {
+                terminalReward = float(terminalRewardCoeff_);
+                return true;
+            }
 
-            bool isFootContactLF = false;
+            return false;
+            
+	        bool isFootContactLF = false;
             bool isFootContactRF = false;
             bool isFootContactLB = false;
             bool isFootContactRB = false;
@@ -313,14 +291,19 @@ namespace raisim {
             for(auto& contact: anymal_->getContacts())
             {
 
-                if ((contact.getlocalBodyIndex() == footIdLF_ - 6) && (contact.getPairObjectBodyType() == raisim::BodyType::STATIC)) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
+                if ((contact.getlocalBodyIndex() == footIdLF_ - 6) && (contact.getPairObjectBodyType() == raisim::BodyType::STATIC) && (contact.getNormal()[2] != 0)) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
                     isFootContactLF = true;
-                if ((contact.getlocalBodyIndex() == footIdRF_ - 6) && (contact.getPairObjectBodyType() == raisim::BodyType::STATIC)) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
+                else if ((contact.getlocalBodyIndex() == footIdRF_ - 6) && (contact.getPairObjectBodyType() == raisim::BodyType::STATIC) && (contact.getNormal()[2] != 0)) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
                     isFootContactRF = true;
-                if ((contact.getlocalBodyIndex() == footIdLB_ - 6) && (contact.getPairObjectBodyType() == raisim::BodyType::STATIC)) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
+                else if ((contact.getlocalBodyIndex() == footIdLB_ - 6) && (contact.getPairObjectBodyType() == raisim::BodyType::STATIC) && (contact.getNormal()[2] != 0)) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
                     isFootContactLB = true;
-                if ((contact.getlocalBodyIndex() == footIdRB_ - 6) && (contact.getPairObjectBodyType() == raisim::BodyType::STATIC)) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
+                else if ((contact.getlocalBodyIndex() == footIdRB_ - 6) && (contact.getPairObjectBodyType() == raisim::BodyType::STATIC) && (contact.getNormal()[2] != 0)) // вычитание вызвано несовпадением индексов фреймов в методах getContacts() и getFrames()
                     isFootContactRB = true;
+                else if ((contact.getPairObjectBodyType() == raisim::BodyType::STATIC) && (contact.getNormal()[2] != 0))
+                {
+                    terminalReward = float(terminalRewardCoeff_);
+                    return true;
+                }
             }
 
             terminalReward = 0.0;
@@ -329,7 +312,7 @@ namespace raisim {
 
             ++flySteps_;
 
-            if (flySteps_ >= 4)
+            if (flySteps_ > 2)
             {
                 terminalReward = float(terminalRewardCoeff_);
                 return true;
@@ -345,16 +328,17 @@ namespace raisim {
         bool visualizable_ = false;
         raisim::ArticulatedSystem* anymal_;
         Eigen::VectorXd gc_init_, gv_init_, gc_, gv_, pTarget_, pTarget12_, vTarget_;
-        double terminalRewardCoeff_ = -1000;
+        double terminalRewardCoeff_ = -100;
         Eigen::VectorXd actionMean_, actionStd_, obDouble_;
-        float stepHeight_;
-        float stepWidth_;
-        float dx_ = 0.325;
-        float dy_ = 0.14;
-        size_t footIdLF_ = 9;
-        size_t footIdRF_ = 12;
-        size_t footIdLB_ = 15;
-        size_t footIdRB_ = 18;
+        double stepHeight_;
+        double stepWidth_;
+        double targetAngularY_;
+        double dx_ = 0.2;
+        double dy_ = 0.14;
+        size_t footIdRF_ = 9;
+        size_t footIdLF_ = 12;
+        size_t footIdRB_ = 15;
+        size_t footIdLB_ = 18;
         int seed_;
         int flySteps_;
 
