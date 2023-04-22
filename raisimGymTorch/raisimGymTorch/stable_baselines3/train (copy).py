@@ -38,10 +38,8 @@ model_load_path = os.path.join(args.model_path)
 
 if args.algorithm == 'PPO':
     from stable_baselines3.ppo.policies import MlpPolicy
-if args.algorithm == 'RPPO':
-    from sb3_contrib.ppo_recurrent.policies import MlpLstmPolicy as MlpPolicy
 elif args.algorithm == 'TRPO':
-    from sb3_contrib.trpo.policies import MlpPolicy
+    from stable_baselines3.ppo.policies import MlpPolicy
 elif args.algorithm == 'SAC':
     from stable_baselines3.sac.policies import MlpPolicy, SACPolicy, MultiInputPolicy
 elif args.algorithm == 'TD3':
@@ -74,7 +72,7 @@ class CustomSACPolicy(MlpPolicy):
 if args.algorithm == 'PPO':
     if not args.model_path:
         print("PPO new algorithm:")
-        model = PPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.95,  learning_rate=0.0005, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.995, clip_range=0.5, device='cuda:0')
+        model = PPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.95,  learning_rate=0.0001, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.995, clip_range=0.5, device='cuda:0')
     else:
         print("PPO old algorithm:")
         model = PPO.load(model_load_path, env)
@@ -83,16 +81,16 @@ if args.algorithm == 'PPO':
 elif args.algorithm == 'RPPO':
     if not args.model_path:
         print("RPPO new algorithm:")
-        model = RPPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.95,  learning_rate=0.0001, verbose=0, batch_size=int(batch_size/10), n_epochs=20, tensorboard_log=logsPath, gamma=0.995, clip_range=0.5, device='cuda:1')
+        model = PPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.95,  learning_rate=0.0001, verbose=0, batch_size=batch_size, n_epochs=4, tensorboard_log=logsPath, gamma=0.995, clip_range=0.5, device='cuda:0')
     else:
         print("RPPO old algorithm:")
-        model = RPPO.load(model_load_path, env)
+        model = PPO.load(model_load_path, env)
         saved_policy = MlpPolicy.load(model_load_path + "Policy")
         model.policy = saved_policy
 elif args.algorithm == 'TRPO':
     if not args.model_path:
         print("TRPO new algorithm:")
-        model = TRPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.97, verbose=0, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.997, target_kl=0.02, device='cuda:0')
+        model = TRPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.97, verbose=0, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.997, target_kl=0.02, device='cuda:1')
     else:
         print("TRPO old algorithm:")
         model = TRPO.load(model_load_path, env)

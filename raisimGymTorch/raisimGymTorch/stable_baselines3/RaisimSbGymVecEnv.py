@@ -22,8 +22,8 @@ class RaisimSbGymVecEnv(VecEnv):
         self.wrapper = impl
         self.num_obs = self.wrapper.getObDim()
         self.num_acts = self.wrapper.getActionDim()
-        self.observation_space = gym.spaces.Box(-np.full(self.num_obs, 10, np.float32), np.full(self.num_obs, 10, np.float32), dtype=np.float32)
-        self.action_space = gym.spaces.Box(-np.full(self.num_acts, 4.0, np.float32), np.full(self.num_acts, 4.0, np.float32), dtype=np.float32)
+        self.observation_space = gym.spaces.Box(-np.full(self.num_obs, 8.0, np.float32), np.full(self.num_obs, 8.0, np.float32), dtype=np.float32)
+        self.action_space = gym.spaces.Box(-np.full(self.num_acts, 2.0, np.float32), np.full(self.num_acts, 2.0, np.float32), dtype=np.float32)
         super(RaisimSbGymVecEnv, self).__init__(self.wrapper.getNumOfEnvs(), self.observation_space, self.action_space)
 
         self._observation = np.zeros([self.num_envs, self.num_obs], dtype=np.float32)
@@ -54,9 +54,6 @@ class RaisimSbGymVecEnv(VecEnv):
 
     def step_async(self, actions: np.ndarray) -> None:
         self.actions = actions
-
-    def getCoords(self):
-        return self.wrapper.getX(), self.wrapper.getY(), self.wrapper.getZ()
 
     def step_wait(self):
         self.wrapper.step(self.actions, self._reward, self._done)
@@ -103,6 +100,9 @@ class RaisimSbGymVecEnv(VecEnv):
 
     def render(self, mode='human'):
         pass
+
+    def getCoords(self):
+        return self.wrapper.getX(), self.wrapper.getY(), self.wrapper.getZ()
 
     def env_is_wrapped(self, wrapper_class: Type[gym.Wrapper], indices: VecEnvIndices = None) -> List[bool]:
         """Check if worker environments are wrapped with a given wrapper"""

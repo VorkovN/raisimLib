@@ -1,3 +1,0 @@
-python3 raisimGymTorch/stable_baselines3/trainPPO.py
-tensorboard --logdir=baselineData/
-python3 raisimGymTorch/stable_baselines3/testPPO.py
