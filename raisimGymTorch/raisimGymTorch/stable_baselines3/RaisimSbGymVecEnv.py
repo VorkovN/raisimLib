@@ -10,7 +10,6 @@ import os
 import gym.spaces.space
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvIndices, Any
 
-
 class RaisimSbGymVecEnv(VecEnv):
     metadata = {}
 
@@ -102,7 +101,7 @@ class RaisimSbGymVecEnv(VecEnv):
         pass
 
     def getCoords(self):
-        return self.wrapper.getX(), self.wrapper.getY(), self.wrapper.getZ()
+        return self.wrapper.getX(), self.wrapper.getY(), self.wrapper.getZ(), self.wrapper.getReward(), self.wrapper.getDone()
 
     def env_is_wrapped(self, wrapper_class: Type[gym.Wrapper], indices: VecEnvIndices = None) -> List[bool]:
         """Check if worker environments are wrapped with a given wrapper"""

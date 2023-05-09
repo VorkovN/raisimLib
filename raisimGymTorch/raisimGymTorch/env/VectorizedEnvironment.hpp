@@ -105,7 +105,19 @@ class VectorizedEnvironment {
       sum += environments_[i]->getZ();
     return sum/num_envs_;
   }
+  float getReward() {
+      float sum = 0.;
+      for (int i = 0; i < num_envs_; i++)
+          sum += environments_[i]->getReward();
+      return sum/num_envs_;
+  }
 
+    float getDone() {
+        float sum = 0.;
+        for (int i = 0; i < num_envs_; i++)
+            sum += environments_[i]->getDone();
+        return sum/num_envs_;
+    }
 
   void step(Eigen::Ref<EigenRowMajorMat> &action, Eigen::Ref<EigenVec> &reward, Eigen::Ref<EigenBoolVec> &done) {
 #pragma omp parallel for schedule(auto)
@@ -248,7 +260,8 @@ class NormalSampler {
     // this ensures that every thread gets a different seed
 #pragma omp parallel for schedule(static, 1)
     for (int i = 0; i < THREAD_COUNT; i++)
-      normal_[0].seed(i + seed);
+//      normal_[i].seed(i);
+      normal_[i].seed(i + seed);
   }
 
   inline void sample(Eigen::Ref<EigenRowMajorMat> &mean,
@@ -262,6 +275,7 @@ class NormalSampler {
       log_prob(agentId) = 0;
       for (int i = 0; i < dim_; i++) {
         const float noise = normal_[omp_get_thread_num()].sample();
+//        const float noise = normal_[agentId].sample();
         samples(agentId, i) = mean(agentId, i) + noise * std(i);
         log_prob(agentId) -= noise * noise * 0.5 + std::log(std(i));
       }
