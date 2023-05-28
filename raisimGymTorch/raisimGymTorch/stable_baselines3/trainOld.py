@@ -1,3 +1,9 @@
+
+
+
+
+
+
 import gym
 import os
 import datetime
@@ -6,7 +12,7 @@ import argparse
 from ruamel.yaml import YAML, dump, RoundTripDumper
 
 #ЕСЛИ ИМПОРТ ПЕРЕНЕСТИ НА СТРОЧКУ НИЖЕ ПРОИЗВОДИТЕЛЬНОСТЬ УПАДЕТ В 10 РАЗ!!!
-from stable_baselines3.common.vec_env import VecNormalize
+
 from sb3_contrib import RecurrentPPO as RPPO
 from stable_baselines3 import PPO
 from sb3_contrib import TRPO
@@ -59,55 +65,55 @@ elif args.environment_type == 'turn':
     from raisimGymTorch.env.bin import anymal_turn as rsg_anymal
 
 env = VecEnv(rsg_anymal.RaisimGymEnv(rscPath, dump(cfg['environment'], Dumper=RoundTripDumper)))
-env = VecNormalize(env)
 obs = env.reset()
 class CustomPolicy(MlpPolicy):
     def __init__(self, *args, **kwargs):
         super(CustomPolicy, self).__init__(*args, **kwargs, net_arch=dict(pi=[128, 128], vf=[128, 128]))
+
 class CustomSACPolicy(MlpPolicy):
     def __init__(self, *args, **kwargs):
-        super(CustomSACPolicy, self).__init__(*args, **kwargs, net_arch=[64, 64])
+        super(CustomSACPolicy, self).__init__(*args, **kwargs, net_arch=[400, 400])
 
 if args.algorithm == 'PPO':
     if not args.model_path:
         print("PPO new algorithm:")
-        model = PPO(CustomPolicy, env, ent_coef=0.001, n_steps=n_steps, gae_lambda=0.95,  learning_rate=0.0004, verbose=0, batch_size=1000, n_epochs=5, tensorboard_log=logsPath, gamma=0.99, clip_range=0.4, device='cuda:1')
+        model = PPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.95,  learning_rate=0.0003, verbose=0, batch_size=400, n_epochs=5, tensorboard_log=logsPath, gamma=0.99, clip_range=0.4, device='cuda:1')
     else:
         print("PPO old algorithm:")
         model = PPO.load(model_load_path, env)
-        env = env.load(model_load_path+"Env", env)
+        env = env.load(model_load_path+"Env")
 elif args.algorithm == 'RPPO':
     if not args.model_path:
         print("RPPO new algorithm:")
-        model = RPPO(CustomPolicy, env, ent_coef=0.01, n_steps=n_steps, gae_lambda=0.95,  learning_rate=0.0004, verbose=0, batch_size=10000, n_epochs=2, tensorboard_log=logsPath, gamma=0.99, clip_range=0.4, device='cuda:0')
+        model = RPPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.95,  learning_rate=0.0003, verbose=0, batch_size=25000, n_epochs=2, tensorboard_log=logsPath, gamma=0.99, clip_range=0.4, device='cuda:1')
     else:
         print("RPPO old algorithm:")
         model = RPPO.load(model_load_path, env)
-        env = env.load(model_load_path+"Env", env)
+        env = env.load(model_load_path+"Env")
 elif args.algorithm == 'TRPO':
     if not args.model_path:
         print("TRPO new algorithm:")
-        model = TRPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.95, learning_rate=0.0004, verbose=0, batch_size=2000, tensorboard_log=logsPath, gamma=0.99, target_kl=0.02, device='cuda:0')
+        model = TRPO(CustomPolicy, env, n_steps=n_steps, gae_lambda=0.95, verbose=0, batch_size=1000, tensorboard_log=logsPath, gamma=0.99, target_kl=0.02, device='cuda:0')
     else:
         print("TRPO old algorithm")
         model = TRPO.load(model_load_path, env=env)
-        env = env.load(model_load_path+"Env", env)
+        env = env.load(model_load_path+"Env")
 elif args.algorithm == 'SAC':
     if not args.model_path:
         print("SAC new algorithm:")
-        model = SAC(MlpPolicy, env, verbose=0, ent_coef="auto_0.001", tau=0.002, train_freq=n_steps, buffer_size=10000000, batch_size=2000, tensorboard_log=logsPath, gamma=0.99, device='cuda:0')
+        model = SAC(MlpPolicy, env, verbose=0, ent_coef="auto_0.1", tau=0.001, train_freq=n_steps, batch_size=1000, tensorboard_log=logsPath, gamma=0.99, device='cuda:0')
     else:
         print("SAC old algorithm:")
         model = SAC.load(model_load_path, env)
-        env = env.load(model_load_path+"Env", env)
+        env = env.load(model_load_path+"Env")
 elif args.algorithm == 'TD3':
     if not args.model_path:
         print("TD3 new algorithm:")
-        model = TD3(MlpPolicy, env, verbose=0, train_freq=n_steps, batch_size=2000, tensorboard_log=logsPath, gamma=0.995, device='cuda:0')
+        model = TD3(MlpPolicy, env, verbose=0, train_freq=n_steps, batch_size=batch_size, tensorboard_log=logsPath, gamma=0.995)
     else:
         print("TD3 old algorithm:")
         model = TD3.load(model_load_path, env)
-        env = env.load(model_load_path+"Env", env)
+        env = env.load(model_load_path+"Env")
 else:
     print("Wrong algorithm: " + args.algorithm)
     exit(0)
@@ -117,16 +123,10 @@ class TensorboardCallback(BaseCallback):
         super().__init__(verbose)
 
     def _on_step(self) -> bool:
-        x, y, z, r, d = env.getCoords()
-
-        #if x > 5.9:
-            
-
+        x, y, z = env.getCoords()
         self.logger.record('Coords/x', x)
         self.logger.record('Coords/y', y)
         self.logger.record('Coords/z', z)
-        self.logger.record('Stat/reward', r)
-        self.logger.record('Stat/done', d)
         return True
 
     def _on_rollout_end(self) -> None:
@@ -135,9 +135,9 @@ class TensorboardCallback(BaseCallback):
         pass
 
 for iteration in range(10):
-    #    print("iteration: ", iteration, flush=True)
+#    print("iteration: ", iteration, flush=True)
     print(model.get_parameters())
-    model.learn(total_timesteps=100000000, progress_bar=True, callback=TensorboardCallback())
+    model.learn(total_timesteps=50000000, progress_bar=True, callback=TensorboardCallback())
 
     archeiveName = str(modelsPath + modelName + str(iteration))
     envName = archeiveName+"Env"
@@ -146,13 +146,11 @@ for iteration in range(10):
     del model
     del env
 
-    env = VecEnv(rsg_anymal.RaisimGymEnv(rscPath, dump(cfg['environment'], Dumper=RoundTripDumper)))
-    env = VecNormalize(env)
-    env = env.load(envName, env)
-    obs = env.reset()
+#    env = VecEnv(rsg_anymal.RaisimGymEnv(rscPath, dump(cfg['environment'], Dumper=RoundTripDumper)))
+#    obs = env.reset()
 
     if args.algorithm == 'PPO':
-        model = PPO.load(archeiveName, env=env, device='cuda:1')
+        model = PPO.load(archeiveName, env=env)
     elif args.algorithm == 'RPPO':
         model = RPPO.load(archeiveName, env=env)
     elif args.algorithm == 'TRPO':
@@ -162,26 +160,27 @@ for iteration in range(10):
     elif args.algorithm == 'TD3':
         model = TD3.load(archeiveName, env=env)
 
-
+    env = env.load(envName)
 
 #    model.save(modelsPath + modelName + str(iteration))
 #    policy = model.policy
 #    policy.save(modelsPath + modelName + str(iteration) + "Policy")
 
-    obs = env.reset()
-    for iteration in range(3000):
-        print("iteration: ", iteration, flush=True)
+#    obs = env.reset()
+#    for iteration in range(3):
+#        print("iteration: ", iteration, flush=True)
 #        env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(iteration)+'.mp4')
-
-        for step in range(n_steps):
-            print("step: ", step)
-            frame_start = time.time()
-            action, _state = model.predict(obs, deterministic=False)
-            obs, reward, done, info = env.step(action)
-            frame_end = time.time()
-            wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
-            if wait_time > 0.:
-                time.sleep(wait_time)
-
+#
+#        for step in range(n_steps):
+#            print("step: ", step)
+#            frame_start = time.time()
+#            action, _state = model.predict(obs, deterministic=False)
+#            obs, reward, done, info = env.step(action)
+#            frame_end = time.time()
+#            wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
+#            if wait_time > 0.:
+#                time.sleep(wait_time)
+#
 #        env.stop_video_recording()
+
 
